@@ -28,6 +28,11 @@ struct parameters {
 
     int linesCounter; //количество строк. для индексации (индексы без \r)
 
+    int curlev; //текущий уровень
+    int pc; //индекс след. команды ?
+    int cno; //???
+    int regs[16]; //множество свободных регистров
+
 };
 
 char* Compile(char* );

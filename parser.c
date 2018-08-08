@@ -84,6 +84,11 @@ int init(struct parameters* storage, char* sourceCode) {
 
     storage->linesCounter = 0;
 
+    storage->curlev = 0;
+    storage->pc = 0;
+    storage->cno = 0;
+    memset(storage->regs, 0, sizeof(int) * 16);
+
     return 0;
 
 }
@@ -121,14 +126,13 @@ void closeGenerator() {
 void module(struct parameters* storage) {
 
     char modid[idLen] = "\0"; //название модуля
-    int varsize;
+    int varsize; //??
 
     signal("Compilation begins.", storage);
 
     if(storage->lastLexemeCode == moduleLexical) {
 
         get(storage);
-        openGenerator(storage); //todo
         openScope(); //todo
         varsize = 0;
 
