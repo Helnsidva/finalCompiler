@@ -14,6 +14,10 @@ void EnterKW(int sym, char name[], struct keyLex* keyTab[], int* i) {
 
 void InitLexical(struct parameters* storage) {
 
+    for(int i = 0; i < 34; i++) {
+        storage->keyTab[i] = (struct keyLex*)malloc(sizeof(struct keyLex));
+    }
+
     int i = 0;
     EnterKW(nullLexical, "BY", storage->keyTab, &i);
     EnterKW(doLexical, "DO", storage->keyTab, &i);
@@ -71,6 +75,8 @@ int init(struct parameters* storage, char* sourceCode) {
 
     InitLexical(storage);
 
+    storage->linesCounter = 0;
+
     return 0;
 
 }
@@ -90,12 +96,11 @@ char* Compile(char* sourceCode) {
         return NULL;
     }
 
-    while(storage->lastLexemeCode != 64) {
-        get(storage);
-    }
+    get(storage);
 
     module();
 
-    return storage->outputCode;
+    //return storage->outputCode;
+    return storage->sourceCode;
 
 }

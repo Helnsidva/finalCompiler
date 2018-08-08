@@ -26,6 +26,8 @@ struct parameters {
 
     struct keyLex* keyTab[kw];
 
+    int linesCounter;
+
 };
 
 char* Compile(char* );

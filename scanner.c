@@ -13,8 +13,8 @@ void Mark(char msg[], struct parameters* storage) {
     int p;
     p = storage->lastPosition;
     if (p > storage->errpos) {
-        fprintf(storage->reportFile, "error: position %d %s \n", p, msg);
-        printf("error: position %d %s \n", p, msg);
+        fprintf(storage->reportFile, "error: position %d %s \n\n", p - storage->linesCounter, msg);
+        printf("error: position %d %s \n", p - storage->linesCounter, msg);
     }
     storage->errpos = p;
     storage->error = 1;
@@ -32,7 +32,7 @@ void comment(struct parameters* storage) {
         }
     }
     if (storage->sourceCode[index] == '\0') {
-        Mark("comment is not completed", storage);
+        Mark("comment not terminated", storage);
     }
     else {
         index++;
@@ -58,11 +58,13 @@ void Number(struct parameters* storage) {
         while ((storage->sourceCode[index] != '\0') &&
                (isdigit(storage->sourceCode[index]))) index++; //go to the end of numb
         Mark("too big number", storage);
+        storage->lastLexemeCode = nullLexical;
     }
     else {
         getNumber = atoll(numberString);
         if (getNumber > MAXINT) {
             Mark("too big number", storage);
+            storage->lastLexemeCode = nullLexical;
         }
         else {
             storage->lastLexemeCode = numberLexical;
@@ -70,6 +72,9 @@ void Number(struct parameters* storage) {
         }
     }
     storage->lastPosition = index;
+    if (isalpha(storage->sourceCode[index])) {
+        Mark("no space?", storage);
+    }
 
 }
 
@@ -86,8 +91,9 @@ void Ident(struct parameters* storage) {
     identification[indexString] = '\0';
 
     if (isalnum(storage->sourceCode[index])) {
-        while ((storage->sourceCode[index] != '\0') && (isalnum(storage->sourceCode[index]))) index++;
+        while (isalnum(storage->sourceCode[index])) index++;
         Mark("too large identification", storage);
+        storage->lastLexemeCode = nullLexical;
     }
     else {
         int k = 0;
@@ -101,6 +107,10 @@ void Ident(struct parameters* storage) {
         }
     }
     storage->lastPosition = index;
+    storage->lastPosition = index;
+    if (isalpha(storage->sourceCode[index])) {
+        Mark("no space?", storage);
+    }
 
 }
 
@@ -113,7 +123,11 @@ void get(struct parameters* storage) {
     strcpy(storage->lastLexeme, "\0");
     storage->lastLexemeValue = -1;
 
-    while ((storage->sourceCode[index] != '\0') && (storage->sourceCode[index] <= ' ')) index++;
+    while((storage->sourceCode[index] != '\0') && (storage->sourceCode[index] <= ' ')) {
+        if(storage->sourceCode[index] == '\r')
+            storage->linesCounter++;
+        index++;
+    }
     readChar = storage->sourceCode[index];
 
     storage->lastPosition = index;
@@ -178,7 +192,7 @@ void get(struct parameters* storage) {
             case ':':
                 if (storage->sourceCode[index + 1] == '=') {
                     storage->lastLexemeCode = becomesLexical;
-                    index += 2;
+                    storage->lastPosition += 2;
                 }
                 else {
                     storage->lastLexemeCode = colonLexical;
@@ -213,6 +227,7 @@ void get(struct parameters* storage) {
                 break;
             case '~':
                 storage->lastLexemeCode = notLexical;
+                storage->lastPosition++;
                 break;
             default:
                 if (isdigit(readChar)) {
