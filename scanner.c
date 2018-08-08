@@ -13,7 +13,7 @@ void Mark(char msg[], struct parameters* storage) {
     int p;
     p = storage->lastPosition;
     if (p > storage->errpos) {
-        fprintf(storage->reportFile, "error: position %d %s \n\n", p - storage->linesCounter, msg);
+        fprintf(storage->reportFile, "error: position %d %s\r\n", p - storage->linesCounter, msg);
         printf("error: position %d %s \n", p - storage->linesCounter, msg);
     }
     storage->errpos = p;
@@ -25,6 +25,9 @@ void comment(struct parameters* storage) {
 
     int index = storage->lastPosition + 2;
     for (index; storage->sourceCode[index] != '\0'; index++) {
+        if (storage->sourceCode[index] == '\r') {
+            storage->linesCounter++;
+        }
         if (storage->sourceCode[index] == ')') {
             if (storage->sourceCode[index - 1] == '*') {
                 break;

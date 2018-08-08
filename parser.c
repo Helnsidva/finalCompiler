@@ -81,7 +81,7 @@ int init(struct parameters* storage, char* sourceCode) {
 
 }
 
-void module() {
+void module(struct parameters* storage) {
 
 
 
@@ -98,7 +98,7 @@ char* Compile(char* sourceCode) {
 
     get(storage);
 
-    module();
+    module(storage); //todo 0
 
     //return storage->outputCode;
     return storage->sourceCode;

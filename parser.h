@@ -10,23 +10,23 @@ struct keyLex {
 
 struct parameters {
 
-    char* sourceCode;
+    char* sourceCode; //исходный код
     char* outputCode;
 
-    int lastPosition;
+    int lastPosition; //последняя просмотренная позиция
 
-    char lastLexeme[idLen];
-    int lastLexemeCode;
-    int lastLexemeValue;
+    char lastLexeme[idLen]; //последний идентификатор
+    int lastLexemeCode; //код последнего символа
+    int lastLexemeValue; //последнее число
 
-    int error;
-    int errpos;
+    int error; //флаг ошибки
+    int errpos; //зачем?
 
-    FILE* reportFile;
+    FILE* reportFile; //файл с ошибками
 
-    struct keyLex* keyTab[kw];
+    struct keyLex* keyTab[kw]; //для инициализации сканера
 
-    int linesCounter;
+    int linesCounter; //количество строк. для индексации (индексы без \r)
 
 };
 
