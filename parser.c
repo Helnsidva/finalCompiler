@@ -4,6 +4,11 @@
 
 #include "scanner.h"
 
+void signal(char msg[], struct parameters* storage) {
+    fprintf(storage->reportFile, "%s\r\n", msg);
+    printf("%s\n", msg);
+}
+
 void EnterKW(int sym, char name[], struct keyLex* keyTab[], int* i) {
 
     keyTab[*i]->sym = sym;
@@ -60,6 +65,7 @@ int init(struct parameters* storage, char* sourceCode) {
 
     //буду сюда писать все по мере необходимости!
     storage->sourceCode = sourceCode;
+    storage->outputCode = NULL;
     storage->lastPosition = 0;
     strcpy(storage->lastLexeme, "\0");
     storage->lastLexemeCode = -1;
@@ -81,8 +87,118 @@ int init(struct parameters* storage, char* sourceCode) {
 
 }
 
+
+
+void openGenerator() {
+    printf("openGenerator\n");
+}
+
+void openScope() {
+    printf("openScope\n");
+}
+
+void declarations() {
+    printf("declarations\n");
+}
+
+void ProcedureDecl() {
+    printf("ProcedureDecl\n");
+}
+
+void headerGenerator() {
+    printf("headerGenerator\n");
+}
+
+void StatSequence() {
+    printf("StatSequence\n");
+}
+
+void CloseScope() {
+    printf("CloseScope\n");
+}
+
+void closeGenerator() {
+    printf("closeGenerator\n");
+}
+
 void module(struct parameters* storage) {
 
+    char modid[idLen] = "\0"; //название модуля
+    int varsize;
+
+    signal("Compilation begins.", storage);
+
+    if(storage->lastLexemeCode == moduleLexical) {
+
+        get(storage);
+        openGenerator(); //todo
+        openScope(); //todo
+        varsize = 0;
+
+        if(storage->lastLexemeCode == identLexical) {
+            strcpy(modid, storage->lastLexeme);
+            char recordingString[idLen + 16] = "Compiles module ";
+            strcat(recordingString, modid);
+            strcat(recordingString, ".");
+            signal(recordingString, storage);
+            get(storage);
+        }
+        else {
+            Mark("module ident?", storage);
+        }
+
+        if(storage->lastLexemeCode == semicolonLexical)
+            get(storage);
+        else
+            Mark(";?", storage);
+
+        declarations(); //todo
+
+        while(storage->lastLexemeCode == procedureLexical) {
+
+            ProcedureDecl(); //todo
+
+            if(storage->lastLexemeCode == semicolonLexical)
+                get(storage);
+            else
+                Mark(";?", storage);
+        }
+
+        headerGenerator(); //todo
+
+        if(storage->lastLexemeCode == beginLexical) {
+            get(storage);
+            StatSequence(); //todo
+        }
+
+        if(storage->lastLexemeCode == endLexical)
+            get(storage);
+        else
+            Mark("END?", storage);
+        if(storage->lastLexemeCode == identLexical) {
+            if(strcmp(modid, storage->lastLexeme)) {
+                Mark("wrong module ident", storage);
+            }
+            get(storage);
+        }
+        else
+            Mark("module ident?", storage);
+        if(storage->lastLexemeCode != periodLexical)
+            Mark(".?", storage);
+
+        CloseScope(); //todo
+
+        if(!storage->error) {
+
+            closeGenerator(); //todo
+            signal("Code generated.", storage);
+
+        }
+
+    }
+    else {
+        Mark("module?", storage);
+    }
 
 }
 
@@ -99,7 +215,8 @@ char* Compile(char* sourceCode) {
 
     module(storage); //todo 0
 
-    //return storage->outputCode;
-    return storage->sourceCode;
+    signal("Compilation finished.", storage);
+
+    return storage->outputCode;
 
 }

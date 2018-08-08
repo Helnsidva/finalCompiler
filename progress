@@ -7,5 +7,6 @@ main:
 
 scanner:
 иниц. всего для сканнера
-Compile +
-делаю Module
+Compile+
+Module+, только нет аргументов в некоторых вызовах
+
