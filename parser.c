@@ -84,7 +84,6 @@ int init(struct parameters* storage, char* sourceCode) {
 void module(struct parameters* storage) {
 
 
-
 }
 
 char* Compile(char* sourceCode) {
