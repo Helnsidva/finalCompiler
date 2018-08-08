@@ -3,4 +3,4 @@ project(finalCompiler C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(finalCompiler main.c scanner.c parser.c codeGenerator.c scanner.h parser.h codeGenerator.h)
+add_executable(finalCompiler main.c scanner.c parser.c codeGenerator.c scanner.h parser.h codeGenerator.h risc.c risc.h)

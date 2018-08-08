@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "scanner.h"
+#include "codeGenerator.h"
 
 void signal(char msg[], struct parameters* storage) {
     fprintf(storage->reportFile, "%s\r\n", msg);
@@ -89,10 +90,6 @@ int init(struct parameters* storage, char* sourceCode) {
 
 
 
-void openGenerator() {
-    printf("openGenerator\n");
-}
-
 void openScope() {
     printf("openScope\n");
 }
@@ -131,7 +128,7 @@ void module(struct parameters* storage) {
     if(storage->lastLexemeCode == moduleLexical) {
 
         get(storage);
-        openGenerator(); //todo
+        openGenerator(storage); //todo
         openScope(); //todo
         varsize = 0;
 

@@ -1,0 +1,1 @@
+void openGenerator(struct parameters*);
