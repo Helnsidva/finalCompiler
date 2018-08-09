@@ -8,6 +8,34 @@ struct keyLex {
 
 };
 
+struct Object {
+    int class; //переменная, функция, ..
+    int lev; //уровень
+    struct Object* next; //следующий
+    struct Object* dsc; //предыдущий объект при открытии scope
+    struct Type* type; //тип переменной, ..
+    char name[16]; //16 - max identifier length
+    int val; //значение для числа
+};
+
+struct Type {
+    int form;
+    struct Object* fields;
+    struct Type* base;
+    int size;
+    int len;
+};
+
+struct Item {
+    int mode;
+    int lev;
+    struct Type* type;
+    int a;
+    int b;
+    int c;
+    int r;
+};
+
 struct parameters {
 
     char* sourceCode; //исходный код
@@ -32,6 +60,13 @@ struct parameters {
     int pc; //индекс след. команды ?
     int cno; //???
     int regs[16]; //множество свободных регистров
+
+    struct Type* boolType;
+    struct Type* intType;
+
+    struct Object* topScope;
+    struct Object* guard;
+    struct Object* universe;
 
 };
 

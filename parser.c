@@ -5,9 +5,25 @@
 #include "scanner.h"
 #include "codeGenerator.h"
 
+void openScope(struct parameters*);
+
 void signal(char msg[], struct parameters* storage) {
     fprintf(storage->reportFile, "%s\r\n", msg);
     printf("%s\n", msg);
+}
+
+void enter(int class, int n, char name[], struct Type* type, struct parameters* storage) {
+
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+
+    obj->class = class;
+    obj->val = n;
+    strcpy(obj->name, name);
+    obj->type = type;
+    obj->dsc = NULL;
+    obj->next = storage->topScope->next;
+    storage->topScope->next = obj;
+
 }
 
 void EnterKW(int sym, char name[], struct keyLex* keyTab[], int* i) {
@@ -62,6 +78,46 @@ void InitLexical(struct parameters* storage) {
 
 }
 
+void initTypes(struct parameters* storage) {
+
+    storage->boolType = (struct Type*)malloc(sizeof(struct Type));
+    storage->boolType->form = BooleanGen;
+    storage->boolType->size = 4;
+
+    storage->intType = (struct Type*)malloc(sizeof(struct Type));
+    storage->intType->form = IntegerGen;
+    storage->intType->size = 4;
+
+}
+
+void initScopes(struct parameters* storage) {
+
+    //в dsc хранится предыдущий scope
+    //в next хранятся объекты текущего scope
+    storage->topScope = (struct Object*)malloc(sizeof(struct Object));
+    storage->guard = (struct Object*)malloc(sizeof(struct Object));
+    storage->universe = (struct Object*)malloc(sizeof(struct Object));
+
+    storage->guard->class = VarGen;
+    storage->guard->type = storage->intType;
+    storage->guard->val = 0; //зачем инициализировать guard??
+
+    storage->topScope = NULL;
+    openScope(storage);
+
+    enter(TypGen, 1, "BOOLEAN", storage->boolType, storage);
+    enter(TypGen, 2, "INTEGER", storage->intType, storage);
+    enter(ConstGen, 1, "TRUE", storage->boolType, storage);
+    enter(ConstGen, 0, "FALSE", storage->boolType, storage);
+    enter(SProcGen, 1, "Read", NULL, storage);
+    enter(SProcGen, 2, "Write", NULL, storage);
+    enter(SProcGen, 3, "WriteHex", NULL, storage);
+    enter(SProcGen, 4, "WriteLn", NULL, storage);
+
+    storage->universe = storage->topScope;
+
+}
+
 int init(struct parameters* storage, char* sourceCode) {
 
     //буду сюда писать все по мере необходимости!
@@ -89,14 +145,22 @@ int init(struct parameters* storage, char* sourceCode) {
     storage->cno = 0;
     memset(storage->regs, 0, sizeof(int) * 16);
 
+    initTypes(storage);
+
+    initScopes(storage);
+
     return 0;
 
 }
 
 
 
-void openScope() {
-    printf("openScope\n");
+void openScope(struct parameters* storage) {
+    struct Object* s = (struct Object*)malloc(sizeof(struct Object)); //todo Object
+    s->class = HeadGen;
+    s->dsc = storage->topScope; //todo init topScope
+    s->next = storage->guard; //todo init guard
+    storage->topScope = s;
 }
 
 void declarations() {
@@ -133,7 +197,7 @@ void module(struct parameters* storage) {
     if(storage->lastLexemeCode == moduleLexical) {
 
         get(storage);
-        openScope(); //todo
+        openScope(storage); //todo
         varsize = 0;
 
         if(storage->lastLexemeCode == identLexical) {
