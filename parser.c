@@ -154,17 +154,132 @@ int init(struct parameters* storage, char* sourceCode) {
 }
 
 
+void NewObj() {
+    printf("NewObj\n");
+}
+
+void expression() {
+    printf("expression\n");
+}
+
+void Type() {
+    printf("Type\n");
+}
+
+void IdentList(int class, struct Object* first, struct parameters* storage) {
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+    if(storage->lastLexemeCode == identLexical) {
+        NewObj();
+        get(storage);
+        while(storage->lastLexemeCode == commaLexical) {
+            get(storage);
+            if(storage->lastLexemeCode == identLexical) {
+                NewObj();
+                get(storage);
+            }
+            else
+                Mark("ident?", storage);
+        }
+        if(storage->lastLexemeCode == colonLexical)
+            get(storage);
+        else
+            Mark(":?", storage);
+    }
+}
 
 void openScope(struct parameters* storage) {
-    struct Object* s = (struct Object*)malloc(sizeof(struct Object)); //todo Object
+    struct Object* s = (struct Object*)malloc(sizeof(struct Object));
     s->class = HeadGen;
-    s->dsc = storage->topScope; //todo init topScope
-    s->next = storage->guard; //todo init guard
+    s->dsc = storage->topScope;
+    s->next = storage->guard;
     storage->topScope = s;
 }
 
-void declarations() {
-    printf("declarations\n");
+int declarations(struct parameters* storage, int argVarsize) { //возвращается новое значение varsize
+
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item)); //структура для анализа выражений
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object)); //структура для рассматриваемого объекта
+    struct Object* first = (struct Object*)malloc(sizeof(struct Object)); //хз
+    struct Type* tp = (struct Type*)malloc(sizeof(struct Type));
+
+    int varsize = argVarsize;
+
+    if((storage->lastLexemeCode < constLexical) && (storage->lastLexemeCode != endLexical)) {
+        Mark("declaration?", storage);
+        do {
+            get(storage);
+        } while ((storage->lastLexemeCode < constLexical) && (storage->lastLexemeCode != endLexical));
+    } //если не const, type, var, procedure, begin, module, end. останавливается на eof
+
+    while((storage->lastLexemeCode >= constLexical) && (storage->lastLexemeCode <= varLexical)) {
+
+        if(storage->lastLexemeCode == constLexical) {
+            get(storage);
+            while(storage->lastLexemeCode == identLexical) {
+                NewObj(); //todo //создание нового объекта
+                get(storage);
+                if(storage->lastLexemeCode == eqlLexical)
+                    get(storage);
+                else
+                    Mark("=?", storage); //так как это const, должна быть инициализация
+                expression(); //todo //анализ выражения
+                if(x->mode == ConstGen) {
+                    obj->val = x->a;
+                    obj->type = x->type;
+                }
+                else {
+                    Mark("expression is not constant", storage);
+                }
+                if(storage->lastLexemeCode == semicolonLexical)
+                    get(storage);
+                else
+                    Mark(";?", storage);
+            }
+        }
+
+        if(storage->lastLexemeCode == typeLexical) {
+            get(storage);
+            while(storage->lastLexemeCode == identLexical) {
+                NewObj();
+                get(storage);
+                if(storage->lastLexemeCode == eqlLexical)
+                    get(storage);
+                else
+                    Mark("=?", storage);
+                Type(); //todo //анализ объявления типа
+                if(storage->lastLexemeCode == semicolonLexical)
+                    get(storage);
+                else
+                    Mark(";?", storage);
+            }
+        }
+
+        if(storage->lastLexemeCode == varLexical) {
+            get(storage);
+            while(storage->lastLexemeCode == identLexical) {
+                IdentList(VarGen, first, storage); //todo //получаем список идентификаторов
+                Type(); //получаем тип идентификаторов
+                obj = first; //заполняем поля созданных объектов //todo ПРОВЕРИТЬ МЕНЯЕТ ЛИ
+                while(obj != storage->guard) {
+                    varsize += tp->size;
+                    obj->type = tp;
+                    obj->lev = storage->curlev;
+                    obj->val = -varsize;
+                    obj = obj->next;
+                }
+                if(storage->lastLexemeCode == semicolonLexical)
+                    get(storage);
+                else
+                    Mark(";?", storage);
+            }
+        }
+
+        if((storage->lastLexemeCode >= constLexical) && (storage->lastLexemeCode <= varLexical))
+            Mark("wrong declarations order?", storage); //потому что const->type->var
+
+    }
+    return varsize;
+
 }
 
 void ProcedureDecl() {
@@ -197,7 +312,7 @@ void module(struct parameters* storage) {
     if(storage->lastLexemeCode == moduleLexical) {
 
         get(storage);
-        openScope(storage); //todo
+        openScope(storage);
         varsize = 0;
 
         if(storage->lastLexemeCode == identLexical) {
@@ -217,7 +332,7 @@ void module(struct parameters* storage) {
         else
             Mark(";?", storage);
 
-        declarations(); //todo
+        varsize = declarations(storage, varsize); //todo
 
         while(storage->lastLexemeCode == procedureLexical) {
 
