@@ -205,15 +205,47 @@ struct Object* find(struct parameters* storage) {
 
 }
 
-struct Item* selector(struct parameters* storage) {
-    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+struct Item* selector(struct Item* x, struct parameters* storage) { //передается уже инициализированный элемент
+    struct Item* retX = x;
     struct Item* y = (struct Item*)malloc(sizeof(struct Item));
     struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
-
-    return x;
+    //если нет обращения к элементам, то это просто переменная
+    while((storage->lastLexemeCode == lbrakLexical) || (storage->lastLexemeCode == periodLexical)) { // [ либо .
+        if(storage->lastLexemeCode == lbrakLexical) {
+            get(storage);
+            y = expression(storage); //x[y]
+            if(retX->type->form == ArrayGen) {}
+                //Index(); //todo
+            else
+                Mark("not an array", storage);
+            if(storage->lastLexemeCode == rbrakLexical)
+                get(storage);
+            else
+                Mark("]?", storage);
+        } //если обращение к элементу массива
+        else {
+            get(storage);
+            if(storage->lastLexemeCode == identLexical) {
+                if(retX->type->form == RecordGen) {
+                    //FindField(); //todo
+                    get(storage);
+                    if(obj != storage->guard) {
+                        //Field(); //todo
+                    }
+                    else
+                        Mark("undef", storage);
+                }
+                else
+                    Mark("not a record", storage);
+            }
+            else
+                Mark("ident?", storage);
+        } //если обращение к элементу записи
+    }
+    return retX;
 }
 
-struct Item* factor(struct parameters* storage) {
+struct Item* factor(struct parameters* storage) { //множители
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
     struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
     if(storage->lastLexemeCode < lparenLexical) {
@@ -227,7 +259,7 @@ struct Item* factor(struct parameters* storage) {
         obj = find(storage);
         get(storage);
         //MakeItem(); //todo
-        //selector(); //todo
+        x = selector(x, storage); //либо тот же идент, либо элемент массива, либо поле записи
     } //идентификатор
     else if(storage->lastLexemeCode == numberLexical) {
         //MakeConstItem(); //todo
@@ -257,13 +289,13 @@ struct Item* term(struct parameters* storage) {
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
     struct Item* y = (struct Item*)malloc(sizeof(struct Item));
     int op;
-    //factor(); //todo
+    x = factor(storage); //todo
     while((storage->lastLexemeCode >= timesLexical) && (storage->lastLexemeCode <= andLexical)) {
         op = storage->lastLexemeCode;
         get(storage);
         if(storage->lastLexemeCode == andLexical) {}
             //Op1(); //todo
-        //factor(); //todo
+        y = factor(storage); //todo
         //Op2(); //todo
     } //для умножения, div, mod, &
     return x;
@@ -275,22 +307,22 @@ struct Item* SimpleExpression(struct parameters* storage) {
     int op;
     if(storage->lastLexemeCode == plusLexical) {
         get(storage);
-        //term(); //todo
+        x = term(storage); //todo
     } //+item
     else if(storage->lastLexemeCode == minusLexical){
         get(storage);
-        //term(); //todo
+        x = term(storage); //todo
         //Op1(); //todo
     } //-item
     else {
-        //term();
+        x = term(storage);
     } //нет знака
-    while((storage->lastLexemeCode >=plusLexical) && (storage->lastLexemeCode <= orLexical)) {
+    while((storage->lastLexemeCode >= plusLexical) && (storage->lastLexemeCode <= orLexical)) {
         op = storage->lastLexemeCode;
         get(storage);
         if(op == orLexical) {}
             //Op1(); //todo
-        //term(); //todo
+        y = term(storage); //todo
         //Op2(); //todo
     } //анализ суммы/разности/OR
     return x;
@@ -300,11 +332,11 @@ struct Item* expression(struct parameters* storage) {
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
     struct Item* y = (struct Item*)malloc(sizeof(struct Item));
     int op;
-    //SimpleExpression(); //todo анализ первого аругемнта
+    x = SimpleExpression(storage);
     if((storage->lastLexemeCode >= eqlLexical) && (storage->lastLexemeCode <= gtrLexical)) {
         op = storage->lastLexemeCode;
         get(storage);
-        //SimpleExpression(); //todo анализ второго аргумента
+        y = SimpleExpression(storage);
         //Relation(); //todo анализ аргументов со знаком выражения
     } //( = | # | < | <= | > | >= )
     return x;
