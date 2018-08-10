@@ -179,10 +179,11 @@ struct Object* NewObj(int class, struct parameters* storage) {
     return obj;
 }
 
-void find(struct Object* obj, struct parameters* storage) {
+struct Object* find(struct parameters* storage) {
 
     struct Object* s = (struct Object*)malloc(sizeof(struct Object));
     struct Object* x = (struct Object*)malloc(sizeof(struct Object));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
 
     s = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
@@ -191,16 +192,16 @@ void find(struct Object* obj, struct parameters* storage) {
         while(strcmp(x->name, storage->lastLexeme))
             x = x->next;
         if(x != storage->guard)
-            *obj = *x;
+            obj = x;
         else if(s == storage->universe) {
-            *obj = *x;
+            obj = x;
             Mark("not declared", storage);
             x = NULL;
         }
         else
             s = s->dsc;
     } while(x == storage->guard);
-    strcpy(storage->guard->name, "\0");
+    return obj;
 
 }
 
@@ -208,11 +209,12 @@ void expression() {
     printf("expression\n");
 }
 
-void Type(struct Type* type, struct parameters* storage) {
+struct Type* Type(struct parameters* storage) {
     struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
     struct Object* first = (struct Object*)malloc(sizeof(struct Object));
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
     struct Type* tp = (struct Type*)malloc(sizeof(struct Type));
+    struct Type* type = (struct Type*)malloc(sizeof(struct Type));
 
     type = storage->intType;
 
@@ -225,13 +227,14 @@ void Type(struct Type* type, struct parameters* storage) {
     }
 
     if(storage->lastLexemeCode == identLexical) {
-        find(obj, storage);
+        obj = find(storage);
         get(storage);
         if(obj->class == TypGen)
             *type = *(obj->type);
         else
             Mark("type?", storage);
     } //todo test it
+
     else if(storage->lastLexemeCode == arrayLexical) {
         get(storage);
         expression(); //todo
@@ -241,12 +244,13 @@ void Type(struct Type* type, struct parameters* storage) {
             get(storage);
         else
             Mark("OF?", storage);
-        Type(tp, storage);
+        tp = Type(storage);
         type->form = ArrayGen;
         *(type->base) = *tp;
         type->len = x->a; //todo short(x.a)?
         type->size = type->len * tp->size;
     } //todo test it
+
     else if(storage->lastLexemeCode == recordLexical) {
         get(storage);
         type->form = RecordGen;
@@ -255,7 +259,7 @@ void Type(struct Type* type, struct parameters* storage) {
         while((storage->lastLexemeCode == semicolonLexical) || (storage->lastLexemeCode == identLexical)) {
             if(storage->lastLexemeCode == identLexical) {
                 //first = IdentList(FldGen, storage);
-                Type(tp, storage);
+                tp = Type(storage);
                 *obj = *first;
                 while(obj != storage->guard) {
                     *(obj->type) = *tp;
@@ -278,11 +282,12 @@ void Type(struct Type* type, struct parameters* storage) {
     } //todo test it
     else
         Mark("ident type?", storage);
+    return type;
+
 }
 //todo test
 
 struct Object* IdentList(int class, struct parameters* storage) {
-    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
     struct Object* first = (struct Object*)malloc(sizeof(struct Object));
     if(storage->lastLexemeCode == identLexical) {
         first = NewObj(class, storage); //в first первый идентификатор
@@ -290,7 +295,7 @@ struct Object* IdentList(int class, struct parameters* storage) {
         while(storage->lastLexemeCode == commaLexical) {
             get(storage);
             if(storage->lastLexemeCode == identLexical) {
-                obj = NewObj(class, storage);
+                NewObj(class, storage);
                 get(storage);
             }
             else
@@ -352,7 +357,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
                 else
                     Mark(";?", storage);
             }
-        }
+        } //+
 
         if(storage->lastLexemeCode == typeLexical) {
             get(storage);
@@ -363,8 +368,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
                     get(storage);
                 else
                     Mark("=?", storage);
-                obj->type = (struct Type*)malloc(sizeof(struct Type));
-                Type(obj->type, storage); //todo //анализ объявления типа
+                obj->type = Type(storage); //todo //анализ объявления типа
                 if(storage->lastLexemeCode == semicolonLexical)
                     get(storage);
                 else
@@ -376,7 +380,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
             get(storage);
             while(storage->lastLexemeCode == identLexical) {
                 first = IdentList(VarGen, storage);
-                Type(tp, storage); //получаем тип идентификаторов
+                tp = Type(storage); //получаем тип идентификаторов
                 obj = first; //заполняем поля созданных объектов //todo ПРОВЕРИТЬ МЕНЯЕТ ЛИ
                 while(obj != storage->guard) {
                     varsize += tp->size;
@@ -384,7 +388,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
                     obj->lev = storage->curlev;
                     obj->val = -varsize;
                     obj = obj->next;
-                }
+                } //todo вот это тоже проверить
                 if(storage->lastLexemeCode == semicolonLexical)
                     get(storage);
                 else
