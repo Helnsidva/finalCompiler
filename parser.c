@@ -205,9 +205,111 @@ struct Object* find(struct parameters* storage) {
 
 }
 
-void expression() {
-    printf("expression\n");
+struct Item* selector(struct parameters* storage) {
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Item* y = (struct Item*)malloc(sizeof(struct Item));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+
+    return x;
 }
+
+struct Item* factor(struct parameters* storage) {
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+    if(storage->lastLexemeCode < lparenLexical) {
+        Mark("ident?", storage);
+        do {
+            get(storage);
+        } while(storage->lastLexemeCode < lparenLexical);
+    }
+
+    if(storage->lastLexemeCode == identLexical) {
+        obj = find(storage);
+        get(storage);
+        //MakeItem(); //todo
+        //selector(); //todo
+    } //идентификатор
+    else if(storage->lastLexemeCode == numberLexical) {
+        //MakeConstItem(); //todo
+        get(storage);
+    } //число
+    else if(storage->lastLexemeCode == lparenLexical) {
+        get(storage);
+        x = expression(storage);
+        if(storage->lastLexemeCode == rparenLexical)
+            get(storage);
+        else
+            Mark(")?", storage);
+    } //выражение в скобках
+    else if(storage->lastLexemeCode == notLexical) {
+        get(storage);
+        x = factor(storage);
+        //Op1(); //todo
+    } //отрицание
+    else {
+        Mark("factor?", storage);
+        //MakeItem(); //todo
+    }
+    return x;
+}
+
+struct Item* term(struct parameters* storage) {
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Item* y = (struct Item*)malloc(sizeof(struct Item));
+    int op;
+    //factor(); //todo
+    while((storage->lastLexemeCode >= timesLexical) && (storage->lastLexemeCode <= andLexical)) {
+        op = storage->lastLexemeCode;
+        get(storage);
+        if(storage->lastLexemeCode == andLexical) {}
+            //Op1(); //todo
+        //factor(); //todo
+        //Op2(); //todo
+    } //для умножения, div, mod, &
+    return x;
+}
+
+struct Item* SimpleExpression(struct parameters* storage) {
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Item* y = (struct Item*)malloc(sizeof(struct Item));
+    int op;
+    if(storage->lastLexemeCode == plusLexical) {
+        get(storage);
+        //term(); //todo
+    } //+item
+    else if(storage->lastLexemeCode == minusLexical){
+        get(storage);
+        //term(); //todo
+        //Op1(); //todo
+    } //-item
+    else {
+        //term();
+    } //нет знака
+    while((storage->lastLexemeCode >=plusLexical) && (storage->lastLexemeCode <= orLexical)) {
+        op = storage->lastLexemeCode;
+        get(storage);
+        if(op == orLexical) {}
+            //Op1(); //todo
+        //term(); //todo
+        //Op2(); //todo
+    } //анализ суммы/разности/OR
+    return x;
+}
+
+struct Item* expression(struct parameters* storage) {
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Item* y = (struct Item*)malloc(sizeof(struct Item));
+    int op;
+    //SimpleExpression(); //todo анализ первого аругемнта
+    if((storage->lastLexemeCode >= eqlLexical) && (storage->lastLexemeCode <= gtrLexical)) {
+        op = storage->lastLexemeCode;
+        get(storage);
+        //SimpleExpression(); //todo анализ второго аргумента
+        //Relation(); //todo анализ аргументов со знаком выражения
+    } //( = | # | < | <= | > | >= )
+    return x;
+}
+//todo
 
 struct Type* Type(struct parameters* storage) {
     struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
@@ -230,10 +332,10 @@ struct Type* Type(struct parameters* storage) {
         obj = find(storage);
         get(storage);
         if(obj->class == TypGen)
-            *type = *(obj->type);
+            type = obj->type;
         else
             Mark("type?", storage);
-    } //todo test it
+    }
 
     else if(storage->lastLexemeCode == arrayLexical) {
         get(storage);
@@ -344,7 +446,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
                     get(storage);
                 else
                     Mark("=?", storage); //так как это const, должна быть инициализация
-                expression(); //todo //анализ выражения
+                x = expression(storage); //todo //анализ выражения
                 if(x->mode == ConstGen) {
                     obj->val = x->a;
                     obj->type = x->type;
@@ -368,7 +470,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
                     get(storage);
                 else
                     Mark("=?", storage);
-                obj->type = Type(storage); //todo //анализ объявления типа
+                obj->type = Type(storage);
                 if(storage->lastLexemeCode == semicolonLexical)
                     get(storage);
                 else
@@ -380,15 +482,15 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
             get(storage);
             while(storage->lastLexemeCode == identLexical) {
                 first = IdentList(VarGen, storage);
-                tp = Type(storage); //получаем тип идентификаторов
-                obj = first; //заполняем поля созданных объектов //todo ПРОВЕРИТЬ МЕНЯЕТ ЛИ
+                tp = Type(storage);
+                obj = first;
                 while(obj != storage->guard) {
                     varsize += tp->size;
                     obj->type = tp;
                     obj->lev = storage->curlev;
                     obj->val = -varsize;
                     obj = obj->next;
-                } //todo вот это тоже проверить
+                }
                 if(storage->lastLexemeCode == semicolonLexical)
                     get(storage);
                 else
