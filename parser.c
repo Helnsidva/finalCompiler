@@ -154,10 +154,11 @@ int init(struct parameters* storage, char* sourceCode) {
 }
 
 
-void NewObj(struct Object* obj, int class, struct parameters* storage) {
+struct Object* NewObj(int class, struct parameters* storage) {
     //create new non-terminal object
     struct Object* new = (struct Object*)malloc(sizeof(struct Object));
     struct Object* x = (struct Object*)malloc(sizeof(struct Object));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
 
     x = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
@@ -168,13 +169,14 @@ void NewObj(struct Object* obj, int class, struct parameters* storage) {
         new->class = class;
         new->next = storage->guard;
         x->next = new;
-        obj = new;
+        obj = x->next;
     }
     else {
         obj = x->next;
         Mark("declarated already", storage);
     }
     strcpy(storage->guard->name, "\0");
+    return obj;
 }
 
 void find(struct Object* obj, struct parameters* storage) {
@@ -212,7 +214,7 @@ void Type(struct Type* type, struct parameters* storage) {
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
     struct Type* tp = (struct Type*)malloc(sizeof(struct Type));
 
-    *type = *(storage->intType);
+    type = storage->intType;
 
     //типы: array, record, const, type, var, созданный тип
     if((storage->lastLexemeCode != identLexical) && (storage->lastLexemeCode < arrayLexical)) {
@@ -252,7 +254,7 @@ void Type(struct Type* type, struct parameters* storage) {
         openScope(storage);
         while((storage->lastLexemeCode == semicolonLexical) || (storage->lastLexemeCode == identLexical)) {
             if(storage->lastLexemeCode == identLexical) {
-                IdentList(FldGen, first, storage);
+                //first = IdentList(FldGen, storage);
                 Type(tp, storage);
                 *obj = *first;
                 while(obj != storage->guard) {
@@ -278,17 +280,17 @@ void Type(struct Type* type, struct parameters* storage) {
         Mark("ident type?", storage);
 }
 //todo test
-void IdentList(int class, struct Object* first, struct parameters* storage) {
+
+struct Object* IdentList(int class, struct parameters* storage) {
     struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
-    struct Object* saveFirst = (struct Object*)malloc(sizeof(struct Object));
+    struct Object* first = (struct Object*)malloc(sizeof(struct Object));
     if(storage->lastLexemeCode == identLexical) {
-        NewObj(saveFirst, class, storage); //в first первый идентификатор
-        first = saveFirst;
+        first = NewObj(class, storage); //в first первый идентификатор
         get(storage);
         while(storage->lastLexemeCode == commaLexical) {
             get(storage);
             if(storage->lastLexemeCode == identLexical) {
-                NewObj(obj, class, storage);
+                obj = NewObj(class, storage);
                 get(storage);
             }
             else
@@ -299,6 +301,7 @@ void IdentList(int class, struct Object* first, struct parameters* storage) {
         else
             Mark(":?", storage);
     }
+    return first;
 }
 
 void openScope(struct parameters* storage) {
@@ -330,7 +333,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
         if(storage->lastLexemeCode == constLexical) {
             get(storage);
             while(storage->lastLexemeCode == identLexical) {
-                NewObj(obj, ConstGen, storage);
+                obj = NewObj(ConstGen, storage);
                 get(storage);
                 if(storage->lastLexemeCode == eqlLexical)
                     get(storage);
@@ -354,7 +357,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
         if(storage->lastLexemeCode == typeLexical) {
             get(storage);
             while(storage->lastLexemeCode == identLexical) {
-                NewObj(obj, TypGen, storage);
+                obj = NewObj(TypGen, storage);
                 get(storage);
                 if(storage->lastLexemeCode == eqlLexical)
                     get(storage);
@@ -372,7 +375,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
         if(storage->lastLexemeCode == varLexical) {
             get(storage);
             while(storage->lastLexemeCode == identLexical) {
-                IdentList(VarGen, first, storage);
+                first = IdentList(VarGen, storage);
                 Type(tp, storage); //получаем тип идентификаторов
                 obj = first; //заполняем поля созданных объектов //todo ПРОВЕРИТЬ МЕНЯЕТ ЛИ
                 while(obj != storage->guard) {

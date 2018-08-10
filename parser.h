@@ -68,6 +68,9 @@ struct parameters {
     struct Object* guard;
     struct Object* universe;
 
+    struct Object* lastNewObject;
+    struct Object* firstObject;
+
 };
 
 char* Compile(char* );
