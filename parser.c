@@ -230,10 +230,10 @@ struct Item* selector(struct Item* x, struct parameters* storage) { //перед
             get(storage);
             if(storage->lastLexemeCode == identLexical) {
                 if(retX->type->form == RecordGen) {
-                    obj = FindField(x->type->fields, storage); //todo
+                    obj = FindField(x->type->fields, storage);
                     get(storage);
                     if(obj != storage->guard) {
-                        Field(x, obj, storage); //todo
+                        Field(x, obj, storage);
                     }
                     else
                         Mark("undef", storage);
@@ -293,14 +293,14 @@ struct Item* term(struct parameters* storage) {
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
     struct Item* y = (struct Item*)malloc(sizeof(struct Item));
     int op;
-    x = factor(storage); //todo
+    x = factor(storage);
     while((storage->lastLexemeCode >= timesLexical) && (storage->lastLexemeCode <= andLexical)) {
         op = storage->lastLexemeCode;
         get(storage);
         if(storage->lastLexemeCode == andLexical) {}
-            //Op1(); //todo
-        y = factor(storage); //todo
-        //Op2(); //todo
+            Op1(op, x, storage);
+        y = factor(storage);
+        Op2(op, x, y, storage);
     } //для умножения, div, mod, &
     return x;
 }
@@ -311,12 +311,12 @@ struct Item* SimpleExpression(struct parameters* storage) {
     int op;
     if(storage->lastLexemeCode == plusLexical) {
         get(storage);
-        x = term(storage); //todo
+        x = term(storage);
     } //+item
     else if(storage->lastLexemeCode == minusLexical){
         get(storage);
-        x = term(storage); //todo
-        //Op1(); //todo
+        x = term(storage);
+        Op1(minusLexical, x, storage);
     } //-item
     else {
         x = term(storage);
@@ -325,9 +325,9 @@ struct Item* SimpleExpression(struct parameters* storage) {
         op = storage->lastLexemeCode;
         get(storage);
         if(op == orLexical) {}
-            //Op1(); //todo
-        y = term(storage); //todo
-        //Op2(); //todo
+            Op1(op, x, storage);
+        y = term(storage);
+        Op2(op, x, y, storage);
     } //анализ суммы/разности/OR
     return x;
 }
@@ -341,7 +341,7 @@ struct Item* expression(struct parameters* storage) {
         op = storage->lastLexemeCode;
         get(storage);
         y = SimpleExpression(storage);
-        //Relation(); //todo анализ аргументов со знаком выражения
+        Relation(op, x, y, storage);
     } //( = | # | < | <= | > | >= )
     return x;
 }
@@ -375,7 +375,7 @@ struct Type* Type(struct parameters* storage) {
 
     else if(storage->lastLexemeCode == arrayLexical) {
         get(storage);
-        expression(); //todo
+        x = expression(storage);
         if((x->mode == ConstGen) || (x->a < 0))
             Mark("bad index", storage);
         if(storage->lastLexemeCode == ofLexical)
@@ -396,7 +396,7 @@ struct Type* Type(struct parameters* storage) {
         openScope(storage);
         while((storage->lastLexemeCode == semicolonLexical) || (storage->lastLexemeCode == identLexical)) {
             if(storage->lastLexemeCode == identLexical) {
-                //first = IdentList(FldGen, storage);
+                first = IdentList(FldGen, storage);
                 tp = Type(storage);
                 *obj = *first;
                 while(obj != storage->guard) {

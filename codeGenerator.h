@@ -66,3 +66,5 @@ void Field(struct Item*, struct Object*, struct parameters*);
 struct Item* MakeItem(struct Object*, struct parameters*);
 struct Item* MakeConstItem(struct Type*, int, struct parameters*);
 void Op1(struct Item*, int, struct parameters*);
+void Op2(int, struct Item*, struct Item*, struct parameters*);
+void Relation(int, struct Item*, struct Item*, struct parameters*);

@@ -238,3 +238,106 @@ void Op1(struct Item* x, int op, struct parameters* storage) {
 
 }
 //todo
+
+void PutOp(int cd, struct Item* x, struct Item* y, struct parameters* storage) {
+
+    if(x->mode != RegGen)
+        load(x, storage);
+    if(y->mode == ConstGen) {
+        TestRange(y->a, storage);
+        Put(cd + 16, x->r, x->r, y->a, storage);
+    }
+    else {
+        if(y->mode != RegGen)
+            load(y, storage);
+        Put(cd, x->r, x->r, y->r, storage);
+        storage->regs[y->r] = 0;
+    }
+
+}
+
+int merged(int L0, int L1, struct parameters* storage) {
+
+    int L2, L3;
+    if(L0 != 0) {
+        L2 = L0;
+        while(L3 != 0) {
+            L3 = storage->code[L2] % 0x40000;
+            if(L3 != 0)
+                L2 = L3;
+        }
+        storage->code[L2] = storage->code[L2] - L3 + L1;
+        return L0;
+    }
+    else
+        return L1;
+
+}
+
+void Op2(int op, struct Item* x, struct Item* y, struct parameters* storage) {
+
+    //x = x op y;
+    if((x->type->form == IntegerGen) && (y->type->form == IntegerGen)) {
+        if((x->mode == ConstGen) && (y->mode == ConstGen)) {
+            if(op == plusLexical)
+                x->a += y->a;
+            else if(op == minusLexical)
+                x->a -= y->a;
+            else if(op == timesLexical)
+                x->a *= y->a;
+            else if(op == divLexical)
+                x->a /= y->a;
+            else if(op == modLexical)
+                x->a = x->a % y->a;
+            else
+                Mark("bad type", storage);
+        }
+        else {
+            if(op == plusLexical)
+                PutOp(ADDGen, x, y, storage);
+            else if(op == minusLexical)
+                PutOp(SUBGen, x, y, storage);
+            else if(op == timesLexical)
+                PutOp(MULGen, x, y, storage);
+            else if(op == divLexical)
+                PutOp(DIVGen, x, y, storage);
+            else if(op == modLexical)
+                PutOp(MODGen, x, y, storage);
+            else
+                Mark("bad type", storage);
+        }
+    }
+    else if((x->type->form == BooleanGen) && (y->type->form == BooleanGen)) {
+        if(y->mode != CondGen)
+            loadBool(y, storage);
+        if(op == orLexical) {
+            x->a = y->a;
+            x->b = merged(y->b, x->b, storage); //todo
+            x->c = y->c;
+        }
+        else if(op == andLexical) {
+            x->a = merged(y->a, x->a, storage); //todo
+            x->b = y->b;
+            x->c = y->c;
+        }
+    }
+    else
+        Mark("bad type", storage);
+
+}
+
+void Relation(int op, struct Item* x, struct Item* y, struct parameters* storage) {
+
+    if((x->type->form != IntegerGen) || (y->type->form != IntegerGen))
+        Mark("bad type", storage);
+    else {
+        PutOp(CMPGen, x, y, storage);
+        x->c = op - eqlLexical;
+        storage->regs[y->r] = 0;
+    }
+    x->mode = CondGen;
+    x->type = storage->boolType;
+    x->a = 0;
+    x->b = 0;
+
+}
