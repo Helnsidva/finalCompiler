@@ -59,3 +59,10 @@
 #define SPGen 13
 #define LNKGen 14
 #define PCGen 15
+
+void Index(struct Item*, struct Item*, struct parameters*);
+struct Object* FindField(struct Object*, struct parameters*);
+void Field(struct Item*, struct Object*, struct parameters*);
+struct Item* MakeItem(struct Object*, struct parameters*);
+struct Item* MakeConstItem(struct Type*, int, struct parameters*);
+void Op1(struct Item*, int, struct parameters*);

@@ -1,5 +1,6 @@
 #define idLen 16 //max length of identifier
 #define kw 34 //number of term symbols
+#define maxCode 1000
 
 struct keyLex {
 
@@ -70,6 +71,8 @@ struct parameters {
 
     struct Object* lastNewObject;
     struct Object* firstObject;
+
+    int code[maxCode]; //собственно код
 
 };
 

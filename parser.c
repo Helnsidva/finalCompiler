@@ -149,6 +149,9 @@ int init(struct parameters* storage, char* sourceCode) {
 
     initScopes(storage);
 
+    for(int i = 0; i < maxCode; i++)
+        storage->code[i] = 0;
+
     return 0;
 
 }
@@ -214,8 +217,8 @@ struct Item* selector(struct Item* x, struct parameters* storage) { //перед
         if(storage->lastLexemeCode == lbrakLexical) {
             get(storage);
             y = expression(storage); //x[y]
-            if(retX->type->form == ArrayGen) {}
-                //Index(); //todo
+            if(retX->type->form == ArrayGen)
+                Index(x, y, storage);
             else
                 Mark("not an array", storage);
             if(storage->lastLexemeCode == rbrakLexical)
@@ -227,10 +230,10 @@ struct Item* selector(struct Item* x, struct parameters* storage) { //перед
             get(storage);
             if(storage->lastLexemeCode == identLexical) {
                 if(retX->type->form == RecordGen) {
-                    //FindField(); //todo
+                    obj = FindField(x->type->fields, storage); //todo
                     get(storage);
                     if(obj != storage->guard) {
-                        //Field(); //todo
+                        Field(x, obj, storage); //todo
                     }
                     else
                         Mark("undef", storage);
@@ -244,6 +247,7 @@ struct Item* selector(struct Item* x, struct parameters* storage) { //перед
     }
     return retX;
 }
+//todo test it
 
 struct Item* factor(struct parameters* storage) { //множители
     struct Item* x = (struct Item*)malloc(sizeof(struct Item));
@@ -258,11 +262,11 @@ struct Item* factor(struct parameters* storage) { //множители
     if(storage->lastLexemeCode == identLexical) {
         obj = find(storage);
         get(storage);
-        //MakeItem(); //todo
+        x = MakeItem(obj, storage);
         x = selector(x, storage); //либо тот же идент, либо элемент массива, либо поле записи
     } //идентификатор
     else if(storage->lastLexemeCode == numberLexical) {
-        //MakeConstItem(); //todo
+        x = MakeConstItem(storage->intType, storage->lastLexemeValue, storage);
         get(storage);
     } //число
     else if(storage->lastLexemeCode == lparenLexical) {
@@ -276,11 +280,11 @@ struct Item* factor(struct parameters* storage) { //множители
     else if(storage->lastLexemeCode == notLexical) {
         get(storage);
         x = factor(storage);
-        //Op1(); //todo
+        Op1(x, notLexical, storage);
     } //отрицание
     else {
         Mark("factor?", storage);
-        //MakeItem(); //todo
+        x = MakeItem(storage->guard, storage);
     }
     return x;
 }
