@@ -341,3 +341,9 @@ void Relation(int op, struct Item* x, struct Item* y, struct parameters* storage
     x->b = 0;
 
 }
+
+void IncLevel(int n, struct parameters* storage) {
+
+    storage->curlev += n;
+
+}

@@ -542,9 +542,134 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
 
 }
 //todo test
-void ProcedureDecl() {
-    printf("ProcedureDecl\n");
+
+int FPSection(int parblksize, struct parameters* storage) {
+
+    struct Object* first = (struct Object*)malloc(sizeof(struct Object));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+    struct Type* tp = (struct Type*)malloc(sizeof(struct Type));
+    int parsize;
+    int parblksizeRet = parblksize;
+
+    if(storage->lastLexemeCode == varLexical) { //[VAR] ??? : ???
+        get(storage);
+        first = IdentList(ParGen, storage);
+    }
+    else
+        first = IdentList(VarGen, storage);
+    if(storage->lastLexemeCode == identLexical) {
+        obj = find(storage);
+        get(storage);
+        if(obj->class == TypGen)
+            tp = obj->type;
+        else {
+            Mark("ident type?", storage);
+            tp = storage->intType;
+        }
+    }
+    else {
+        Mark("ident?", storage);
+        tp = storage->intType;
+    }
+    if(first->class == VarGen) {
+        parsize = tp->size;
+        if(tp->form >= ArrayGen)
+            Mark("no struct params", storage);
+    }
+    else
+        parsize = WordSize;
+    obj = first;
+    while(obj != storage->guard) {
+        obj->type = tp;
+        parblksizeRet += parsize;
+        obj = obj->next;
+    }
+
 }
+
+void ProcedureDecl(struct parameters* storage) {
+
+    struct Object* proc = (struct Object*)malloc(sizeof(struct Object));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+    char procid[idLen];
+    int locblksize, parblksize;
+    int marksize = 8;
+
+    get(storage);
+    if(storage->lastLexemeCode == identLexical) { //PROC ident
+        strcpy(procid, storage->lastLexeme);
+        proc = NewObj(ProcGen, storage);
+        get(storage);
+        parblksize = marksize;
+        IncLevel(1, storage);
+        openScope(storage);
+        proc->val = -1;
+        if(storage->lastLexemeCode == lparenLexical) { //параметры функции (?? : ??; ?? : ??; ...)
+            get(storage);
+            if(storage->lastLexemeCode == rparenLexical)
+                get(storage);
+            else {
+                FPSection(parblksize, storage);
+                while(storage->lastLexemeCode == semicolonLexical) {
+                    get(storage);
+                    FPSection(parblksize, storage);
+                }
+                if(storage->lastLexemeCode == rparenLexical)
+                    get(storage);
+                else
+                    Mark(")?", storage);
+            }
+        }
+        else if(storage->curlev == 1) {
+            //EnterCmd(procid); //todo
+        }
+        obj = storage->topScope->next;
+        locblksize = parblksize;
+        while(obj != storage->guard) {
+            obj->lev = storage->curlev;
+            if(obj->class == ParGen)
+                locblksize -= WordSize;
+            else {
+                obj->val = locblksize;
+                obj = obj->next;
+            }
+        }
+        proc->dsc = storage->topScope->next; //хз че тут происходит...
+        if(storage->lastLexemeCode == semicolonLexical)
+            get(storage);
+        else
+            Mark(";?", storage);
+        locblksize = 0;
+        declarations(storage, locblksize); //лок. параметры функции
+        while(storage->lastLexemeCode == procedureLexical) {
+            ProcedureDecl(storage);
+            if(storage->lastLexemeCode == semicolonLexical)
+                get(storage);
+            else
+                Mark(";?", storage);
+        } //внутр. функции функции
+        proc->val = PCGen;
+        //Enter(locblksize); //todo
+        if(storage->lastLexemeCode == beginLexical) {
+            get(storage);
+            StatSequence(); //todo
+        }
+        if(storage->lastLexemeCode == endLexical)
+            get(storage);
+        else
+            Mark("end?", storage);
+        if(storage->lastLexemeCode == identLexical) {
+            if(strcmp(procid, storage->lastLexeme))
+                Mark("no match", storage);
+            get(storage);
+        }
+        //Return(parblksize - marksize); //todo
+        CloseScope(); //todo
+        //IncLevel(-1); //todo
+    }
+
+}
+//todo
 
 void headerGenerator() {
     printf("headerGenerator\n");
@@ -592,11 +717,11 @@ void module(struct parameters* storage) {
         else
             Mark(";?", storage);
 
-        varsize = declarations(storage, varsize); //todo
+        varsize = declarations(storage, varsize);
 
         while(storage->lastLexemeCode == procedureLexical) {
 
-            ProcedureDecl(); //todo
+            //ProcedureDecl(); //todo
 
             if(storage->lastLexemeCode == semicolonLexical)
                 get(storage);
