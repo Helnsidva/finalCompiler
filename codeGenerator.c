@@ -347,3 +347,29 @@ void IncLevel(int n, struct parameters* storage) {
     storage->curlev += n;
 
 }
+
+void EnterCmd(char name[], struct parameters* storage) {
+
+    strcpy(storage->comname[storage->cno], name);
+    storage->comadr[storage->cno] = storage->pc * 4;
+    storage->cno++;
+
+}
+
+void Enter(int size, struct parameters* storage) {
+
+    Put(PSHGen, LNKGen, SPGen, 4, storage);
+    Put(PSHGen, FPGen, SPGen, 4, storage);
+    Put(MOVGen, FPGen, 0, SPGen, storage);
+    Put(SUBIGen, SPGen, SPGen, size, storage);
+
+}
+
+void Return(int size, struct parameters* storage) {
+
+    Put(MOVGen, SPGen, 0, FPGen, storage);
+    Put(POPGen, FPGen, SPGen, 4, storage);
+    Put(POPGen, LNKGen, SPGen, size + 4, storage);
+    PutBR(RETGen, LNKGen, storage);
+
+}

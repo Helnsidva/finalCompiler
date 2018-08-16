@@ -69,3 +69,6 @@ void Op1(struct Item*, int, struct parameters*);
 void Op2(int, struct Item*, struct Item*, struct parameters*);
 void Relation(int, struct Item*, struct Item*, struct parameters*);
 void IncLevel(int, struct parameters*);
+void EnterCmd(char [], struct parameters*);
+void Enter(int, struct parameters*);
+void Return(int, struct parameters*);

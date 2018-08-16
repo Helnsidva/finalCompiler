@@ -2,6 +2,7 @@
 #define kw 34 //number of term symbols
 #define maxCode 1000
 #define WordSize 4
+#define NofCom 16
 
 struct keyLex {
 
@@ -74,6 +75,9 @@ struct parameters {
     struct Object* firstObject;
 
     int code[maxCode]; //собственно код
+    char comname[NofCom][idLen];
+    int comadr[NofCom];
+    char mnemo[64][5];
 
 };
 

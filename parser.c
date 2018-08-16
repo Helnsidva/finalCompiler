@@ -152,6 +152,8 @@ int init(struct parameters* storage, char* sourceCode) {
     for(int i = 0; i < maxCode; i++)
         storage->code[i] = 0;
 
+    storage->cno = 0;
+
     return 0;
 
 }
@@ -482,7 +484,7 @@ int declarations(struct parameters* storage, int argVarsize) { //возвращ�
                     get(storage);
                 else
                     Mark("=?", storage); //так как это const, должна быть инициализация
-                x = expression(storage); //todo //анализ выражения
+                x = expression(storage);
                 if(x->mode == ConstGen) {
                     obj->val = x->a;
                     obj->type = x->type;
@@ -621,7 +623,7 @@ void ProcedureDecl(struct parameters* storage) {
             }
         }
         else if(storage->curlev == 1) {
-            //EnterCmd(procid); //todo
+            EnterCmd(procid, storage);
         }
         obj = storage->topScope->next;
         locblksize = parblksize;
@@ -649,7 +651,7 @@ void ProcedureDecl(struct parameters* storage) {
                 Mark(";?", storage);
         } //внутр. функции функции
         proc->val = PCGen;
-        //Enter(locblksize); //todo
+        Enter(locblksize, storage);
         if(storage->lastLexemeCode == beginLexical) {
             get(storage);
             StatSequence(); //todo
@@ -663,9 +665,9 @@ void ProcedureDecl(struct parameters* storage) {
                 Mark("no match", storage);
             get(storage);
         }
-        //Return(parblksize - marksize); //todo
+        Return(parblksize - marksize, storage);
         CloseScope(); //todo
-        //IncLevel(-1); //todo
+        IncLevel(-1, storage);
     }
 
 }
@@ -675,8 +677,135 @@ void headerGenerator() {
     printf("headerGenerator\n");
 }
 
-void StatSequence() {
-    printf("StatSequence\n");
+void StatSequence(struct parameters* storage) {
+
+    //*statement* {; *statement*}
+    //statement: assigment/ ProcCall/ If/ While
+    struct Object* par = (struct Object*)malloc(sizeof(struct Object));
+    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Item* y = (struct Item*)malloc(sizeof(struct Item));
+    int L;
+
+    do {
+        obj = storage->guard;
+        if(storage->lastLexemeCode < identLexical) {
+            Mark("statement?", storage);
+            do {
+                get(storage);
+            } while(storage->lastLexemeCode < identLexical);
+        }
+        if(storage->lastLexemeCode == identLexical) {
+            find(storage);
+            get(storage);
+            x = MakeItem(obj, storage);
+            x = selector(x, storage);
+            if(storage->lastLexemeCode == becomesLexical) { //x := y
+                get(storage);
+                y = expression(storage);
+                //Store(x, y); //todo
+            }
+            else if(storage->lastLexemeCode == eqlLexical) {
+                Mark(":=?", storage);
+                get(storage);
+                y = expression(storage);
+            }
+            else if(x->mode == ProcGen) {
+                par = obj->dsc; //параметры вызываемой функции
+                if(storage->lastLexemeCode == lparenLexical) {
+                    get(storage);
+                    if(storage->lastLexemeCode == rparenLexical)
+                        get(storage);
+                    else {
+                        do {
+                            //parameter(par); //todo
+                            if(storage->lastLexemeCode == commaLexical)
+                                get(storage); //неск. параметров - запятые
+                            else if(storage->lastLexemeCode == rparenLexical)
+                                get(storage); //хз
+                            else if(storage->lastLexemeCode < semicolonLexical)
+                                Mark(") or , ?", storage);
+                        } while(!((storage->lastLexemeCode == rparenLexical) || (storage->lastLexemeCode >= semicolonLexical)));
+                    }
+                }
+                if(obj->val < 0)
+                    Mark("forward call", storage);
+                //else if(!IsParam(par)) //todo
+                    //Call(x); //todo
+                else
+                    Mark("too few parameters", storage);
+            }
+            else if(x->mode == SProcGen) {
+                if(obj->val <= 3) {}
+                    //param(y); //todo
+                //IOCall(x, y); //todo
+            }
+            else if(obj->class == TypGen)
+                Mark("illegal assignment?", storage);
+            else
+                Mark("statement?", storage);
+        }
+        else if(storage->lastLexemeCode == ifLexical) {
+            get(storage);
+            x = expression(storage);
+            //CJump(x); //todo
+            if(storage->lastLexemeCode == thenLexical)
+                get(storage);
+            else
+                Mark("THEN?", storage);
+            StatSequence(storage);
+            L = 0;
+            while(storage->lastLexemeCode == elsifLexical) {
+                get(storage);
+                //FJump(L); //todo
+                //FixLink(x->a); //todo
+                x = expression(storage);
+                //CJump(x); //todo
+                if(storage->lastLexemeCode == thenLexical)
+                    get(storage);
+                else
+                    Mark("THEN?", storage);
+                StatSequence(storage);
+            }
+            if(storage->lastLexemeCode == elseLexical) {
+                get(storage);
+                //FJump(L); //todo
+                //FixLink(x->a); //todo
+                StatSequence(storage);
+            }
+            else {}
+                //FixLink(x->a); //todo
+            //FixLink(L); //todo
+            if(storage->lastLexemeCode == endLexical)
+                get(storage);
+            else
+                Mark("END?", storage);
+        }
+        else if(storage->lastLexemeCode == whileLexical) {
+            get(storage);
+            L = storage->pc;
+            x = expression(storage);
+            //CJump(x);
+            if(storage->lastLexemeCode == doLexical)
+                get(storage);
+            else
+                Mark("DO?", storage);
+            StatSequence(storage);
+            //BJump(L); //todo
+            //FixLink(x->a); //todo
+            if(storage->lastLexemeCode == endLexical)
+                get(storage);
+            else
+                Mark("END?", storage);
+        }
+        if(storage->lastLexemeCode == semicolonLexical)
+            get(storage);
+        else if((storage->lastLexemeCode <= identLexical) || (storage->lastLexemeCode == ifLexical) || (storage->lastLexemeCode == whileLexical)) {
+            Mark(";?", storage); //если идент, if или while, но между ними нет ;
+        }
+
+    } while((storage->lastLexemeCode <= identLexical) || (storage->lastLexemeCode == ifLexical) || (storage->lastLexemeCode == whileLexical));
+
 }
 
 void CloseScope() {
