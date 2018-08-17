@@ -72,3 +72,4 @@ void IncLevel(int, struct parameters*);
 void EnterCmd(char [], struct parameters*);
 void Enter(int, struct parameters*);
 void Return(int, struct parameters*);
+void FixLink(int, struct parameters*);

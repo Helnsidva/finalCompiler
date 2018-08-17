@@ -373,3 +373,35 @@ void Return(int size, struct parameters* storage) {
     PutBR(RETGen, LNKGen, storage);
 
 }
+
+void Store(struct Item* x, struct Item* y, struct parameters* storage) { //x = y
+
+    int r;
+    if((x->type->form == BooleanGen || x->type->form == IntegerGen) && (x->type->form == y->type->form)) {
+        if(y->mode == CondGen) {
+            Put(BEQGen + negated(y->c), y->r, 0, y->a, storage);
+            storage->regs[y->r] = 0;
+            y->a = storage->pc - 1;
+            FixLink(y->b, storage);
+            y->r = GetReg(storage);
+            Put(MOVIGen, y->r, 0, 1, storage);
+            PutBR(BRGen, 2, storage);
+            FixLink(y->a, storage);
+            Put(MOVIGen, y->r, 0, 0, storage);
+        }
+        else if(y->mode != RegGen)
+            load(y, storage);
+        if(x->mode == VarGen) {
+            if(x->lev == 0)
+                x->a = x->a - (storage->pc) * 4;
+            Put(STWGen, y->r, x->r, x->a, storage);
+        }
+        else
+            Mark("illegal assignment", storage);
+        storage->regs[x->r] = 0;
+        storage->regs[y->r] = 0;
+    }
+    else
+        Mark("incompatible assignment", storage);
+
+}

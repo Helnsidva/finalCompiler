@@ -677,6 +677,22 @@ void headerGenerator() {
     printf("headerGenerator\n");
 }
 
+struct Object* parameter(struct Object* fp, struct parameters* storage) {
+
+    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
+    struct Object* newFp = (struct Object*)malloc(sizeof(struct Object));
+    newFp = fp;
+    x = expression(storage);
+    //if(IsParam(newFp)) { //todo
+        //Parameter(x, newFp->type, newFp->class); //todo
+        newFp = newFp->next;
+   // }
+   // else
+        Mark("too many parameters", storage);
+    return newFp;
+
+}
+
 void StatSequence(struct parameters* storage) {
 
     //*statement* {; *statement*}
@@ -703,7 +719,7 @@ void StatSequence(struct parameters* storage) {
             if(storage->lastLexemeCode == becomesLexical) { //x := y
                 get(storage);
                 y = expression(storage);
-                //Store(x, y); //todo
+                Store(x, y, storage);
             }
             else if(storage->lastLexemeCode == eqlLexical) {
                 Mark(":=?", storage);
@@ -718,7 +734,7 @@ void StatSequence(struct parameters* storage) {
                         get(storage);
                     else {
                         do {
-                            //parameter(par); //todo
+                            par = parameter(par, storage);
                             if(storage->lastLexemeCode == commaLexical)
                                 get(storage); //неск. параметров - запятые
                             else if(storage->lastLexemeCode == rparenLexical)
@@ -758,7 +774,7 @@ void StatSequence(struct parameters* storage) {
             while(storage->lastLexemeCode == elsifLexical) {
                 get(storage);
                 //FJump(L); //todo
-                //FixLink(x->a); //todo
+                FixLink(x->a, storage);
                 x = expression(storage);
                 //CJump(x); //todo
                 if(storage->lastLexemeCode == thenLexical)
@@ -770,12 +786,12 @@ void StatSequence(struct parameters* storage) {
             if(storage->lastLexemeCode == elseLexical) {
                 get(storage);
                 //FJump(L); //todo
-                //FixLink(x->a); //todo
+                FixLink(x->a, storage);
                 StatSequence(storage);
             }
             else {}
-                //FixLink(x->a); //todo
-            //FixLink(L); //todo
+                FixLink(x->a, storage);
+            FixLink(L, storage);
             if(storage->lastLexemeCode == endLexical)
                 get(storage);
             else
@@ -792,7 +808,7 @@ void StatSequence(struct parameters* storage) {
                 Mark("DO?", storage);
             StatSequence(storage);
             //BJump(L); //todo
-            //FixLink(x->a); //todo
+            FixLink(x->a, storage);
             if(storage->lastLexemeCode == endLexical)
                 get(storage);
             else
