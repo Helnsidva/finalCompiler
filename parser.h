@@ -1,4 +1,4 @@
-#define idLen 16 //max length of identifier
+#define identLength 16 //max length of identifier
 #define kw 34 //number of term symbols
 #define maxCode 1000
 #define WordSize 4
@@ -42,7 +42,6 @@ struct Item {
 struct parameters {
 
     char* sourceCode; //исходный код
-    char* outputCode;
 
     int lastPosition; //последняя просмотренная позиция
 
@@ -61,7 +60,7 @@ struct parameters {
 
     int curlev; //текущий уровень
     int pc; //индекс след. команды ?
-    int cno; //???
+    int cno; //количество команд
     int regs[16]; //множество свободных регистров
 
     struct Type* boolType;
@@ -77,8 +76,9 @@ struct parameters {
     int code[maxCode]; //собственно код
     char comname[NofCom][idLen];
     int comadr[NofCom];
-    char mnemo[64][5];
+
+    int entry;
 
 };
 
-char* Compile(char* );
+void Compile(char* );

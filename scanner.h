@@ -45,5 +45,4 @@
 #define eofLexical 64
 
 void get(struct parameters*);
-
-void Mark(char[], struct parameters*);
+void mark(char[], struct parameters*);

@@ -1,36 +1,4 @@
-MODULE RISC; (*NW 27. 11. 05*)
- IMPORT SYSTEM, Texts;
- CONST MemSize* = 4096; ProgOrg = 2048; (*in bytes*)
- MOV = 0; MVN = 1; ADD = 2; SUB = 3; MUL = 4; Div = 5; Mod = 6; CMP = 7;
- MOVI = 16; MVNI = 17; ADDI = 18; SUBI = 19; MULI = 20; DIVI = 21; MODI = 22; CMPI = 23;
- CHKI = 24;
- LDW = 32; LDB = 33; POP = 34; STW = 36; STB = 37; PSH = 38;
- RD = 40; WRD= 41; WRH = 42; WRL = 43;
- BEQ = 48; BNE = 49; BLT = 50; BGE = 51; BLE = 52; BGT = 53; BR = 56; BSR = 57; RET = 58;
- VAR IR: LONGINT;
- N, Z: BOOLEAN;
- R*: ARRAY 16 OF LONGINT;
- M*: ARRAY MemSize DIV 4 OF LONGINT;
- W: Texts.Writer;
- (* R15] is PC, R[14] used as link register by BSR instruction*)
- PROCEDURE Execute*(start: LONGINT; VAR in: Texts.Scanner; out: Texts.Text);
- VAR opc, a, b, c, nxt: LONGINT;
- BEGIN R[14] := 0; R[15] := start + ProgOrg;
- LOOP (*interpretation cycle*)
- nxt := R[15] + 4; IR := M[R[15] DIV 4];
- opc := IR DIV 4000000H MOD 40H;
- a := IR DIV 400000H MOD 10H;
- b := IR DIV 40000H MOD 10H;
- c := IR MOD 40000H;
- IF opc < MOVI THEN (*F0*) c := R[IR MOD 10H]
- ELSIF opc < BEQ THEN
- (*F1, F2*) c := IR MOD 40000H;
- IF c >= 20000H THEN DEC(c, 40000H) END (*sign extension*)
- ELSE (*F3*) c := IR MOD 4000000H;
- IF c >= 2000000H THEN DEC(c, 4000000H) END (*sign extension*)
- END ;
- CASE opc OF
- MOV, MOVI: R[a] := ASH(c, b) (*arithmetic shift*)
+   MOV, MOVI: R[a] := ASH(c, b) (*arithmetic shift*)
  | MVN, MVNI: R[a] := -ASH(c, b)
  | ADD, ADDI: R[a] := R[b] + c
  | SUB, SUBI: R[a] := R[b] - c
@@ -40,7 +8,6 @@ MODULE RISC; (*NW 27. 11. 05*)
  | CMP, CMPI: Z := R[b] = c; N := R[b] < c
  | CHKI: IF (R[a] < 0) OR (R[a] >= c) THEN R[a] := 0 END
  | LDW: R[a] := M[(R[b] + c) DIV 4]
-49
  | LDB: (*not implemented*)
  | POP: R[a] := M[(R[b]) DIV 4]; INC(R[b], c)
  | STW: M[(R[b] + c) DIV 4] := R[a]

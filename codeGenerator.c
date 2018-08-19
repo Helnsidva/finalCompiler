@@ -1,6 +1,7 @@
 #include <malloc.h>
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "parser.h"
 #include "scanner.h"
@@ -16,7 +17,7 @@ int ASH(int a, int b) {
 void TestRange(int x, struct parameters* storage) {
 
     if((x >= 0x20000) || (x < -0x20000))
-        Mark("value is too large", storage);
+        mark("value is too large", storage);
 
 } //F1, F2: test im. a - 4, b - 4, im - 18
 
@@ -66,11 +67,11 @@ void load(struct Item* x, struct parameters* storage) {
 void Index(struct Item* x, struct Item* y, struct parameters* storage) {
 
     if(y->type != storage->intType)
-        Mark("index is not integer", storage);
+        mark("index is not integer", storage);
     //x[y]
     if(y->mode == ConstGen) {
         if((y->a < 0) || (y->a >= x->type->len))
-            Mark("bad index", storage);
+            mark("bad index", storage);
         x->a += y->a * x->type->base->size;
     }
     else {
@@ -121,7 +122,7 @@ struct Item* MakeItem(struct Object* y, struct parameters* storage) {
     else if(y->lev == storage->curlev)
         x->r = FPGen;
     else {
-        Mark("level!", storage);
+        mark("level!", storage);
         x->r = 0;
     }
     if(y->class = ParGen) {
@@ -158,7 +159,7 @@ void loadBool(struct Item* x, struct parameters* storage) {
 
     //тот же load, только с проверкой
     if(x->type->form != BooleanGen)
-        Mark("boolean?", storage);
+        mark("boolean?", storage);
     load(x, storage);
     x->mode = CondGen;
     x->a = 0;
@@ -200,7 +201,7 @@ void Op1(struct Item* x, int op, struct parameters* storage) {
 
     if(op == minusLexical) {
         if(x->type->form != IntegerGen)
-            Mark("bad type", storage);
+            mark("bad type", storage);
         else if(x->mode == ConstGen)
             x->a -= 2 * (x->a);
         else {
@@ -232,7 +233,7 @@ void Op1(struct Item* x, int op, struct parameters* storage) {
         PutBR(BEQGen + x->c, x->b, storage);
         storage->regs[x->r] = 0;
         x->b = storage->pc - 1;
-        FixLink(x->a, storage); //todo
+        FixLink(x->a, storage);
         x->a = 0;
     }
 
@@ -290,7 +291,7 @@ void Op2(int op, struct Item* x, struct Item* y, struct parameters* storage) {
             else if(op == modLexical)
                 x->a = x->a % y->a;
             else
-                Mark("bad type", storage);
+                mark("bad type", storage);
         }
         else {
             if(op == plusLexical)
@@ -304,7 +305,7 @@ void Op2(int op, struct Item* x, struct Item* y, struct parameters* storage) {
             else if(op == modLexical)
                 PutOp(MODGen, x, y, storage);
             else
-                Mark("bad type", storage);
+                mark("bad type", storage);
         }
     }
     else if((x->type->form == BooleanGen) && (y->type->form == BooleanGen)) {
@@ -312,24 +313,24 @@ void Op2(int op, struct Item* x, struct Item* y, struct parameters* storage) {
             loadBool(y, storage);
         if(op == orLexical) {
             x->a = y->a;
-            x->b = merged(y->b, x->b, storage); //todo
+            x->b = merged(y->b, x->b, storage);
             x->c = y->c;
         }
         else if(op == andLexical) {
-            x->a = merged(y->a, x->a, storage); //todo
+            x->a = merged(y->a, x->a, storage);
             x->b = y->b;
             x->c = y->c;
         }
     }
     else
-        Mark("bad type", storage);
+        mark("bad type", storage);
 
 }
 
 void Relation(int op, struct Item* x, struct Item* y, struct parameters* storage) {
 
     if((x->type->form != IntegerGen) || (y->type->form != IntegerGen))
-        Mark("bad type", storage);
+        mark("bad type", storage);
     else {
         PutOp(CMPGen, x, y, storage);
         x->c = op - eqlLexical;
@@ -397,11 +398,199 @@ void Store(struct Item* x, struct Item* y, struct parameters* storage) { //x = y
             Put(STWGen, y->r, x->r, x->a, storage);
         }
         else
-            Mark("illegal assignment", storage);
+            mark("illegal assignment", storage);
         storage->regs[x->r] = 0;
         storage->regs[y->r] = 0;
     }
     else
-        Mark("incompatible assignment", storage);
+        mark("incompatible assignment", storage);
+
+}
+
+void Call(struct Item* x, struct parameters* storage) {
+
+    PutBR(BSRGen, x->a - storage->pc, storage);
+
+}
+
+void IOCall(struct Item* x, struct Item* y, struct parameters* storage) {
+
+    struct Item* z = (struct Item*)malloc(sizeof(struct Item));
+    if(x->a < 4) {
+        if(y->type->form != IntegerGen)
+            mark("Integer?", storage);
+    }
+    if(x->a == 1) { //read
+        z->r = GetReg(storage);
+        z->mode = RegGen;
+        z->type = storage->intType;
+        Put(RDGen, z->r, 0, 0, storage);
+        Store(y, z, storage);
+    }
+    else if(x->a == 2) { //write
+        load(y, storage);
+        Put(WRDGen, 0, 0, y->r, storage);
+        storage->regs[y->r] = 0;
+    }
+    else if(x->a == 3) { //writehex
+        load(y, storage);
+        Put(WRHGen, 0, 0, y->r, storage);
+        storage->regs[y->r] = 0;
+    }
+    else //writeln
+        Put(WRLGen, 0, 0, 0, storage);
+
+}
+
+void CJump(struct Item* x, struct parameters* storage) {
+
+    if(x->type->form == BooleanGen) {
+        if(x->mode != CondGen)
+            loadBool(x, storage);
+        PutBR(BEQGen + negated(x->c), x->a, storage);
+        storage->regs[x->r] = 0;
+        FixLink(x->b, storage);
+        x->a = storage->pc - 1;
+    }
+    else {
+        mark("Boolean?", storage);
+        x->a = storage->pc;
+    }
+
+}
+
+void BJump(int L, struct parameters* storage) {
+
+    PutBR(BRGen, L - storage->pc, storage);
+
+}
+
+void FJump(int L, struct parameters* storage) {
+
+    PutBR(BRGen, L, storage);
+    L = storage->pc - 1;
+
+}
+
+void Header(int size, struct parameters* storage) {
+
+    storage->entry = storage->pc;
+    Put(MOVIGen, SPGen, 0, 1024 - size, storage); //todo RISC.Memsize
+    Put(PSHGen, LNKGen, SPGen, 4, storage);
+
+}
+
+void Close(struct parameters* storage) {
+
+    Put(POPGen, LNKGen, SPGen, 4, storage);
+    PutBR(RETGen, LNKGen, storage);
+
+}
+
+void initMnemo(char** mnemo, struct parameters* storage) {
+
+    //todo проверить передачу этой хуни в функцию
+    strcpy(mnemo[MOVGen], "MOV ");
+    strcpy(mnemo[MVNGen], "MVN ");
+    strcpy(mnemo[ADDGen], "ADD ");
+    strcpy(mnemo[SUBGen], "SUB ");
+    strcpy(mnemo[MULGen], "MUL ");
+    strcpy(mnemo[DIVGen], "DIV ");
+    strcpy(mnemo[MODGen], "MOD ");
+    strcpy(mnemo[CMPGen], "CMP ");
+    strcpy(mnemo[MOVIGen], "MOVI ");
+    strcpy(mnemo[MVNIGen], "MVNI ");
+    strcpy(mnemo[ADDIGen], "ADDI ");
+    strcpy(mnemo[SUBIGen], "SUBI ");
+    strcpy(mnemo[MULIGen], "MULI ");
+    strcpy(mnemo[DIVIGen], "DIVI ");
+    strcpy(mnemo[MODIGen], "MODI ");
+    strcpy(mnemo[CMPIGen], "CMPI ");
+    strcpy(mnemo[CHKIGen], "CHKI ");
+    strcpy(mnemo[LDWGen], "LDW ");
+    strcpy(mnemo[LDBGen], "LDB ");
+    strcpy(mnemo[POPGen], "POP ");
+    strcpy(mnemo[STWGen], "STW ");
+    strcpy(mnemo[STBGen], "STB ");
+    strcpy(mnemo[PSHGen], "PSH ");
+    strcpy(mnemo[BEQGen], "BEQ ");
+    strcpy(mnemo[BNEGen], "BNE ");
+    strcpy(mnemo[BLTGen], "BLT ");
+    strcpy(mnemo[BGEGen], "BGE ");
+    strcpy(mnemo[BLEGen], "BLE ");
+    strcpy(mnemo[BGTGen], "BGT ");
+    strcpy(mnemo[BRGen], "BR ");
+    strcpy(mnemo[BSRGen], "BSR ");
+    strcpy(mnemo[RETGen], "RET ");
+    strcpy(mnemo[RDGen], "READ ");
+    strcpy(mnemo[WRDGen], "WRD ");
+    strcpy(mnemo[WRHGen], "WRH ");
+    strcpy(mnemo[WRLGen], "WRL ");
+
+}
+
+void decode(struct parameters* storage) {
+
+    //запись кода в файл
+    int w, a, op, i;
+    FILE* outputFile = NULL;
+    printf("Recording compiled code...\n");
+    if((outputFile = fopen("output.txt", "wb")) == NULL) {
+        printf("Opening output file error!\n");
+        fprintf(storage->reportFile, "Opening output file error!\r\n");
+        return;
+    }
+    char mnemo[64][5];
+    initMnemo(&mnemo, storage);
+    fprintf(outputFile, "entry %d\n", storage->entry * 4);
+    for(i = 0; i < storage->pc; i++) {
+        w = storage->code[i];
+        op = w / 0x4000000 % 0x40;
+        fprintf(outputFile, "%d %s ", 4 * i, mnemo[op]);
+        if(op < BEQGen) {
+            a = w % 0x40000;
+            if(a >= 0x20000)
+                a -= 0x40000;
+            fprintf(outputFile, "%d, %d,  ", w / 0x400000 % 0x10, w / 0x40000 % 0x10);
+        }
+        else {
+            a = w % 0x4000000;
+            if(a >= 0x2000000)
+                a -= 0x4000000;
+        }
+        fprintf(outputFile, "%d\n", a);
+    }
+    fclose(outputFile);
+    printf("Compiled code is in the \"output.txt\" file in the current directory. Bye!\n");
+
+}
+
+void Parameter(struct Item* x, struct Type* ftyp, int class, struct parameters* storage) {
+
+    int r;
+    if(x->type == ftyp) {
+        if(class == ParGen) {
+            if(x->mode == VarGen) {
+                if(x->a != 0) {
+                    r = GetReg(storage);
+                    Put(ADDIGen, r, x->r, x->a, storage);
+                }
+                else
+                    r = x->r;
+            }
+            else
+                mark("Illegal parameter mode", storage);
+            Put(PSHGen, r, SPGen, 4, storage);
+            storage->regs[r] = 0;
+        }
+        else {
+            if(x->mode != RegGen)
+                load(x, storage);
+            Put(PSHGen, x->r, SPGen, 4, storage);
+            storage->regs[x->r] = 0;
+        }
+    }
+    else
+        mark("Bad parameter type", storage);
 
 }

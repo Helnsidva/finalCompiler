@@ -8,7 +8,7 @@
 #define MAXINTLENGTH 10
 #define MAXINT 2147483647
 
-void Mark(char msg[], struct parameters* storage) {
+void mark(char msg[], struct parameters* storage) {
 
     int p;
     p = storage->lastPosition;
@@ -35,7 +35,7 @@ void comment(struct parameters* storage) {
         }
     }
     if (storage->sourceCode[index] == '\0') {
-        Mark("comment not terminated", storage);
+        mark("comment not terminated", storage);
     }
     else {
         index++;
@@ -60,13 +60,13 @@ void Number(struct parameters* storage) {
     if (isdigit(storage->sourceCode[index])) { //if numb length is too big
         while ((storage->sourceCode[index] != '\0') &&
                (isdigit(storage->sourceCode[index]))) index++; //go to the end of numb
-        Mark("too big number", storage);
+        mark("too big number", storage);
         storage->lastLexemeCode = nullLexical;
     }
     else {
         getNumber = atoll(numberString);
         if (getNumber > MAXINT) {
-            Mark("too big number", storage);
+            mark("too big number", storage);
             storage->lastLexemeCode = nullLexical;
         }
         else {
@@ -76,7 +76,7 @@ void Number(struct parameters* storage) {
     }
     storage->lastPosition = index;
     if (isalpha(storage->sourceCode[index])) {
-        Mark("no space?", storage);
+        mark("no space?", storage);
     }
 
 }
@@ -85,17 +85,17 @@ void Ident(struct parameters* storage) {
 
     int index = storage->lastPosition;
     int indexString = 0;
-    char identification[idLen + 1];
+    char identification[identLength + 1];
 
     for (indexString, index; (storage->sourceCode[index] != '\0') &&
-                             (isalnum(storage->sourceCode[index])) && (indexString < idLen); indexString++, index++) {
+                             (isalnum(storage->sourceCode[index])) && (indexString < identLength); indexString++, index++) {
         identification[indexString] = storage->sourceCode[index];
     }
     identification[indexString] = '\0';
 
     if (isalnum(storage->sourceCode[index])) {
         while (isalnum(storage->sourceCode[index])) index++;
-        Mark("too large identification", storage);
+        mark("too large identification", storage);
         storage->lastLexemeCode = nullLexical;
     }
     else {
@@ -112,7 +112,7 @@ void Ident(struct parameters* storage) {
     storage->lastPosition = index;
     storage->lastPosition = index;
     if (isalpha(storage->sourceCode[index])) {
-        Mark("no space?", storage);
+        mark("no space?", storage);
     }
 
 }
@@ -242,7 +242,7 @@ void get(struct parameters* storage) {
                 else {
                     storage->lastLexemeCode = nullLexical;
                     storage->lastPosition++;
-                    Mark("unknown symbol", storage); //todo
+                    mark("unknown symbol", storage); //todo
                 }
                 break;
         }
