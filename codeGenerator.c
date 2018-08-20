@@ -465,10 +465,11 @@ void BJump(int L, struct parameters* storage) {
 
 }
 
-void FJump(int L, struct parameters* storage) {
+int FJump(int L, struct parameters* storage) {
 
+    int retL;
     PutBR(BRGen, L, storage);
-    L = storage->pc - 1;
+    retL = storage->pc - 1;
 
 }
 

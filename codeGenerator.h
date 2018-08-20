@@ -78,7 +78,7 @@ void Call(struct Item*, struct parameters*);
 void IOCall(struct Item*, struct Item*, struct parameters*);
 void CJump(struct Item*, struct parameters*);
 void BJump(int, struct parameters*);
-void FJump(int, struct parameters*);
+int FJump(int, struct parameters*);
 void Header(int, struct parameters*);
 void Close(struct parameters*);
 void decode(struct parameters*);
