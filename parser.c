@@ -6,6 +6,11 @@
 #include "codeGenerator.h"
 
 void openScope(struct parameters*);
+void closeScope(struct parameters*);
+void statements(struct parameters*);
+struct Item* expression(struct parameters*);
+struct Object* identifiersList(int, struct parameters*);
+int parameterFormat(struct Object*);
 
 void signal(char msg[], struct parameters* storage) {
 
@@ -14,30 +19,30 @@ void signal(char msg[], struct parameters* storage) {
     printf("%s\n", msg);
 
 }
-//+
+
 void enterUniverse(int class, int value, char *name, struct Type *type, struct parameters *storage) {
 
     //создание объектов в universe
     struct Object* newObject = (struct Object*)malloc(sizeof(struct Object));
     newObject->class = class;
-    newObject->val = value;
+    newObject->value = value;
     strcpy(newObject->name, name);
     newObject->type = type;
-    newObject->dsc = NULL;
-    newObject->next = storage->topScope->next;
-    storage->topScope->next = newObject;
+    newObject->previousScope = NULL;
+    newObject->nextObject = storage->topScope->nextObject;
+    storage->topScope->nextObject = newObject;
 
 }
-//+
+
 void enterKeyTab(int symbol, char *name, struct keyLex **keyTab, int *index) {
 
     //инициализация элемента keyTab
-    keyTab[*index]->sym = symbol;
-    strcpy(keyTab[*index]->id, name);
+    keyTab[*index]->symbol = symbol;
+    strcpy(keyTab[*index]->identifier, name);
     (*index)++;
 
 }
-//+
+
 void initLexical(struct parameters *storage) {
 
     //инициализация структуры для сканнера
@@ -82,19 +87,19 @@ void initLexical(struct parameters *storage) {
     enterKeyTab(moduleLexical, "MODULE", storage->keyTab, &i);
 
 }
-//+
+
 void initTypes(struct parameters* storage) {
 
     //инициализация базовых типов. int и bool. их размер = 4
     storage->boolType = (struct Type*)malloc(sizeof(struct Type));
-    storage->boolType->form = BooleanGen;
+    storage->boolType->type = BooleanGen;
     storage->boolType->size = 4;
     storage->intType = (struct Type*)malloc(sizeof(struct Type));
-    storage->intType->form = IntegerGen;
+    storage->intType->type = IntegerGen;
     storage->intType->size = 4;
 
 }
-//+
+
 void initScopes(struct parameters* storage) {
 
     //инициализация областей видимости - scopes.
@@ -108,7 +113,7 @@ void initScopes(struct parameters* storage) {
     storage->universe = (struct Object*)malloc(sizeof(struct Object));
     storage->guard->class = VarGen;
     storage->guard->type = storage->intType;
-    storage->guard->val = 0;
+    storage->guard->value = 0;
     storage->topScope = NULL;
     openScope(storage); //открытие universe
     enterUniverse(TypGen, 1, "BOOLEAN", storage->boolType, storage);
@@ -122,7 +127,7 @@ void initScopes(struct parameters* storage) {
     storage->universe = storage->topScope;
 
 }
-//+
+
 int init(struct parameters* storage, char* sourceCode) {
 
     //инициализация прочего
@@ -132,7 +137,7 @@ int init(struct parameters* storage, char* sourceCode) {
     storage->lastLexemeCode = -1;
     storage->lastLexemeValue = -1;
     storage->error = 0;
-    storage->errpos = -1;
+    storage->errorPosition = -1;
     storage->reportFile = NULL;
     if((storage->reportFile = fopen("report.txt", "wb")) == NULL) {
         printf("Opening report.txt file error!\n");
@@ -140,20 +145,17 @@ int init(struct parameters* storage, char* sourceCode) {
     }
     initLexical(storage);
     storage->linesCounter = 0; //todo считать строки
-    storage->curlev = 0;
-    storage->pc = 0;
-    storage->cno = 0;
-    memset(storage->regs, 0, sizeof(int) * 16);
+    storage->currentLevel = 0;
+    storage->PC = 0;
+    memset(storage->registers, 0, sizeof(int) * 16);
     initTypes(storage);
     initScopes(storage);
-    for(int i = 0; i < maxCode; i++)
+    for(int i = 0; i < maxCodeSize; i++)
         storage->code[i] = 0;
-    storage->cno = 0;
-    storage->entry = 0;
+    storage->entryAddress = 0;
     return 0;
 
 }
-//+
 
 struct Object* createNewObject(int class, struct parameters* storage) {
 
@@ -162,23 +164,23 @@ struct Object* createNewObject(int class, struct parameters* storage) {
     struct Object* buffer;
     buffer = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
-    while(strcmp(buffer->next->name, storage->lastLexeme))
-        buffer = buffer->next;
-    if(buffer->next == storage->guard) { //если дошли до guard - такого объекта в этом scope нет - создаем объект
+    while(strcmp(buffer->nextObject->name, storage->lastLexeme))
+        buffer = buffer->nextObject;
+    if(buffer->nextObject == storage->guard) { //если дошли до guard - такого объекта в этом scope нет - создаем объект
         strcpy(newObject->name, storage->lastLexeme);
         newObject->class = class;
-        newObject->next = storage->guard;
-        buffer->next = newObject;
+        newObject->nextObject = storage->guard;
+        buffer->nextObject = newObject;
     }
     else { //иначе - ошибка
-        newObject = buffer->next;
+        newObject = buffer->nextObject;
         mark("Declared already", storage);
     }
     strcpy(storage->guard->name, "\0"); //"обнуляем" guard
     return newObject;
 
 }
-//+
+
 struct Object* findObject(struct parameters* storage) {
 
     //поиск объекта во всех scope
@@ -188,9 +190,9 @@ struct Object* findObject(struct parameters* storage) {
     bufferHead = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
     do {
-        buffer = bufferHead->next;
+        buffer = bufferHead->nextObject;
         while(strcmp(buffer->name, storage->lastLexeme))
-            buffer = buffer->next;
+            buffer = buffer->nextObject;
         if(buffer != storage->guard)
             object = buffer; //если проверили scope и нашли объект
         else if(bufferHead == storage->universe) { //если не нашли и мы уже на внешнем scope
@@ -199,13 +201,13 @@ struct Object* findObject(struct parameters* storage) {
             buffer = NULL; //для выхода из цикла
         }
         else
-            bufferHead = bufferHead->dsc; //иначе идем на уровень ниже
+            bufferHead = bufferHead->previousScope; //иначе идем на уровень ниже
     } while(buffer == storage->guard);
     strcpy(storage->guard->name, "\0"); //"обнуляем" guard
     return object;
 
 }
-//+
+
 struct Item* selector(struct Item* item, struct parameters* storage) { //передается уже инициализированный элемент
 
     //чтение элемента массива / поля записи
@@ -217,7 +219,7 @@ struct Item* selector(struct Item* item, struct parameters* storage) { //пер�
         if(storage->lastLexemeCode == lbrakLexical) {
             get(storage);
             indexExpression = expression(storage); //x[y]. получаем y
-            if(newItem->type->form == ArrayGen)
+            if(newItem->type->type == ArrayGen)
                 Index(newItem, indexExpression, storage); //если переменная - массив, получаем значение по индексу todo
             else
                 mark("Not an array", storage); //иначе - ошибка
@@ -229,7 +231,7 @@ struct Item* selector(struct Item* item, struct parameters* storage) { //пер�
         else {
             get(storage);
             if(storage->lastLexemeCode == identLexical) { //x.y. y - всегда индентификатор!
-                if(newItem->type->form == RecordGen) { //если тип x - запись
+                if(newItem->type->type == RecordGen) { //если тип x - запись
                     fieldObject = FindField(newItem->type->fields, storage); //находим, если ли такое поле у x todo
                     get(storage);
                     if(fieldObject != storage->guard) {
@@ -248,7 +250,7 @@ struct Item* selector(struct Item* item, struct parameters* storage) { //пер�
     return newItem;
 
 }
-//+
+
 struct Item* factor(struct parameters* storage) { //множители
 
     //анализ идентификатора либо числа
@@ -281,7 +283,7 @@ struct Item* factor(struct parameters* storage) { //множители
     else if(storage->lastLexemeCode == notLexical) {
         get(storage);
         item = factor(storage);
-        Op1(item, notLexical, storage); //выражение со знаком -
+        Op1(notLexical, item, storage); //выражение со знаком -
     } //отрицание
     else {
         mark("Factor?", storage);
@@ -290,7 +292,7 @@ struct Item* factor(struct parameters* storage) { //множители
     return item;
 
 }
-//+
+
 struct Item* term(struct parameters* storage) {
 
     //анализ выражений: x * y, x DIV y, x MOD y, x & y
@@ -309,7 +311,7 @@ struct Item* term(struct parameters* storage) {
     return leftExpression;
 
 }
-//+
+
 struct Item* simpleExpression(struct parameters* storage) {
 
     //анализ суммы, разности, |. учитывается знак перед первым аргументом (- или +)
@@ -339,7 +341,7 @@ struct Item* simpleExpression(struct parameters* storage) {
     return leftExpression;
 
 }
-//+
+
 struct Item* expression(struct parameters* storage) {
 
     //анализ либо переменной, либо лог. выражения x ( = | # | < | <= | > | >= ) y
@@ -356,7 +358,7 @@ struct Item* expression(struct parameters* storage) {
     return leftExpression;
 
 }
-//+
+
 struct Type* getType(struct parameters* storage) {
 
     //чтение типа. (array, record, intType, boolType, созданный тип)
@@ -364,8 +366,7 @@ struct Type* getType(struct parameters* storage) {
     struct Object* listHeader;
     struct Item* expressionItem;
     struct Type* typeBuffer;
-    struct Type* type;
-    type = storage->intType;
+    struct Type* type = (struct Type*)malloc(sizeof(struct Type));
     if((storage->lastLexemeCode != identLexical) && (storage->lastLexemeCode < arrayLexical)) {
         mark("type?", storage);
         do {
@@ -389,14 +390,14 @@ struct Type* getType(struct parameters* storage) {
             get(storage);
         else
             mark("OF?", storage);
-        type->form = ArrayGen;
-        type->base = getType(storage); //баз. тип
-        type->len = expressionItem->a; // "длина" массива
-        type->size = type->len * type->base->size; //размер массива - длина * размер типа
+        type->type = ArrayGen;
+        type->baseType = getType(storage); //баз. тип
+        type->length = expressionItem->a; // "длина" массива
+        type->size = type->length * type->baseType->size; //размер массива - длина * размер типа
     }
     else if(storage->lastLexemeCode == recordLexical) { //RECORD *ident1*, *ident2* : *type1* {; *identN* : *typeN*} END
         get(storage);
-        type->form = RecordGen;
+        type->type = RecordGen;
         type->size = 0;
         openScope(storage);
         while((storage->lastLexemeCode == semicolonLexical) || (storage->lastLexemeCode == identLexical)) { //чтение полей
@@ -406,9 +407,9 @@ struct Type* getType(struct parameters* storage) {
                 objectBuffer = listHeader;
                 while(objectBuffer != storage->guard) { //записываем тип для всех идентификаторов
                     objectBuffer->type = typeBuffer;
-                    objectBuffer->val = type->size; //todo val - адрес?
+                    objectBuffer->value = type->size; //todo val - адрес?
                     type->size += typeBuffer->size;
-                    objectBuffer = objectBuffer->next;
+                    objectBuffer = objectBuffer->nextObject;
                 }
             }
             if(storage->lastLexemeCode == semicolonLexical)
@@ -416,7 +417,7 @@ struct Type* getType(struct parameters* storage) {
             else if(storage->lastLexemeCode == identLexical)
                 mark(";?", storage);
         }
-        type->fields = storage->topScope->next; //->fields - указатель на первое поле. структура как в scope
+        type->fields = storage->topScope->nextObject; //->fields - указатель на первое поле. структура как в scope
         closeScope(storage); //закрываем scope. использовали его просто как буфер
         if(storage->lastLexemeCode == endLexical)
             get(storage);
@@ -425,10 +426,13 @@ struct Type* getType(struct parameters* storage) {
     }
     else
         mark("Identifier type?", storage);
-    return type;
+    if(type != NULL)
+        return type;
+    else
+        return storage->intType;
 
 }
-//+
+
 struct Object* identifiersList(int class, struct parameters *storage) {
 
     //чтение всех идентификаторов вида ident1, ... , ident2 : . возврат указателя на первый элемент
@@ -453,18 +457,18 @@ struct Object* identifiersList(int class, struct parameters *storage) {
     return headerObject;
 
 }
-//+
+
 void openScope(struct parameters* storage) {
 
     //открытие нового scope
     struct Object* newScope = (struct Object*)malloc(sizeof(struct Object));
     newScope->class = HeadGen; //первый элемент scope - head
-    newScope->dsc = storage->topScope; //dsc - указатель на предыдущий scope
-    newScope->next = storage->guard; //след. элемента нет
+    newScope->previousScope = storage->topScope; //dsc - указатель на предыдущий scope
+    newScope->nextObject = storage->guard; //след. элемента нет
     storage->topScope = newScope; //новая вершина scopes
 
 }
-//+
+
 int declarations(struct parameters* storage, int argVarSize) { //возвращается новое значение varSize
 
     //чтение объявлений CONST, TYPE, VAR
@@ -473,12 +477,6 @@ int declarations(struct parameters* storage, int argVarSize) { //возвращ�
     struct Object* identListHead; //для множества идентификаторов. указатель на первый элемент
     struct Type* currentType; //тип переменной
     int varSize = argVarSize;
-    if((storage->lastLexemeCode < constLexical) && (storage->lastLexemeCode != endLexical)) {
-        mark("Declaration?", storage);
-        do {
-            get(storage);
-        } while ((storage->lastLexemeCode < constLexical) && (storage->lastLexemeCode != endLexical));
-    } //если не const, type, var, procedure, begin, module, end. останавливается на eof
     while((storage->lastLexemeCode >= constLexical) && (storage->lastLexemeCode <= varLexical)) { //пока const, type, var
         if(storage->lastLexemeCode == constLexical) {
             get(storage);
@@ -491,7 +489,7 @@ int declarations(struct parameters* storage, int argVarSize) { //возвращ�
                     mark("=?", storage); //так как это const, должна быть инициализация
                 currentExpression = expression(storage); // CONST *ident1* = *expr*; x = *expr*
                 if(currentExpression->mode == ConstGen) { //опять же, так как это const
-                    currentObject->val = currentExpression->a; //поля значений
+                    currentObject->value = currentExpression->a; //поля значений
                     currentObject->type = currentExpression->type; //поля типов
                 }
                 else
@@ -528,9 +526,9 @@ int declarations(struct parameters* storage, int argVarSize) { //возвращ�
                 while(currentObject != storage->guard) { //для всех полученных объектов
                     varSize += currentType->size; //размер типа + к varSize
                     currentObject->type = currentType; //тип
-                    currentObject->lev = storage->curlev; //текущий уровень. для отличия переменных разных scope-ов
-                    currentObject->val = -varSize; //todo смещение относительно базового адреса?
-                    currentObject = currentObject->next;
+                    currentObject->level = storage->currentLevel; //текущий уровень. для отличия переменных разных scope-ов
+                    currentObject->value = -varSize; //todo смещение относительно базового адреса?
+                    currentObject = currentObject->nextObject;
                 }
                 if(storage->lastLexemeCode == semicolonLexical)
                     get(storage);
@@ -544,7 +542,7 @@ int declarations(struct parameters* storage, int argVarSize) { //возвращ�
     return varSize;
 
 }
-//+
+
 int parametersBlockAnalyzer(struct parameters *storage) {
 
     //чтение блока формальных параметров функции
@@ -575,21 +573,21 @@ int parametersBlockAnalyzer(struct parameters *storage) {
     }
     if(listHead->class == VarGen) {
         typeSize = currentType->size; //если размер отличается от допустимого (4) - ошибка, но все равно присваиваем
-        if(currentType->form >= ArrayGen)
+        if(currentType->type >= ArrayGen)
             mark("Incorrect type of var parameters", storage); //параметром var может быть только int либо bool
     }
     else
-        typeSize = WordSize; //если не var - то int или bool. размер = 4
+        typeSize = wordSize; //если не var - то int или bool. размер = 4
     objectBuffer = listHead;
     while(objectBuffer != storage->guard) { //инициализируем тип для всех новых объектов. считаем их размер
         objectBuffer->type = currentType;
         parametersSize += typeSize;
-        objectBuffer = objectBuffer->next;
+        objectBuffer = objectBuffer->nextObject;
     }
     return parametersSize;
 
 }
-//+
+
 void procedureAnalyzer(struct parameters *storage) {
 
     //анализ процедур. PROCEDURE *ident*(*FormalParameters*) *ProcBody*
@@ -597,7 +595,7 @@ void procedureAnalyzer(struct parameters *storage) {
     struct Object* objectBuffer;
     char procedureName[identLength];
     int currentBlockSize, parametersSize;
-    int marksize = 8;
+    int marksize = 8; //todo
     get(storage);
     if(storage->lastLexemeCode == identLexical) { //PROCEDURE *ident*
         strcpy(procedureName, storage->lastLexeme); //получили идент. процедуры
@@ -606,7 +604,7 @@ void procedureAnalyzer(struct parameters *storage) {
         parametersSize = marksize; //todo ??
         IncLevel(1, storage); //todo level for proc
         openScope(storage); //открываем scope для новой процедуры
-        currentProcedure->val = -1; //todo why???
+        currentProcedure->value = -1; //todo why???
         if(storage->lastLexemeCode == lparenLexical) { //параметры функции (?? : ??; ?? : ??; ...)
             get(storage);
             if(storage->lastLexemeCode == rparenLexical) //если ()
@@ -623,22 +621,19 @@ void procedureAnalyzer(struct parameters *storage) {
                     mark(")?", storage);
             }
         }
-        else if(storage->curlev == 1) {
-            EnterCmd(procedureName, storage);
-        } //todo хз зачем
-        objectBuffer = storage->topScope->next; //переходим к первому параметру
+        objectBuffer = storage->topScope->nextObject; //переходим к первому параметру
         currentBlockSize = parametersSize;
         while(objectBuffer != storage->guard) { //полю val каждого объекта присваиваем значение смещения относительно
                                           //кадра активации. смещение положительное
-            objectBuffer->lev = storage->curlev;
+            objectBuffer->level = storage->currentLevel;
             if(objectBuffer->class == ParGen)
-                currentBlockSize -= WordSize;
+                currentBlockSize -= wordSize;
             else
                 currentBlockSize -= objectBuffer->type->size; //инкремент. смещение каждую итерацию
-            objectBuffer->val = currentBlockSize; //присваивание смещения
-            objectBuffer = objectBuffer->next;
+            objectBuffer->value = currentBlockSize; //присваивание смещения
+            objectBuffer = objectBuffer->nextObject;
         }
-        currentProcedure->dsc = storage->topScope->next; //дескриптор процесса - его параметры ? todo
+        currentProcedure->previousScope = storage->topScope->nextObject; //дескриптор процесса - его параметры ? todo
         if(storage->lastLexemeCode == semicolonLexical)
             get(storage);
         else
@@ -652,7 +647,7 @@ void procedureAnalyzer(struct parameters *storage) {
             else
                 mark(";?", storage);
         } //внутр. функции функции
-        currentProcedure->val = storage->pc; //todo
+        currentProcedure->value = storage->PC; //todo
         Enter(currentBlockSize, storage); //запись пролога процедуры
         if(storage->lastLexemeCode == beginLexical) { //тело процедуры BEGIN procbody END *procident*
             get(storage);
@@ -673,7 +668,7 @@ void procedureAnalyzer(struct parameters *storage) {
     }
 
 }
-//+
+
 struct Object* parameter(struct Object* formalParameter, struct parameters* storage) {
 
     //проверка параметра процедуры на корректность
@@ -683,22 +678,22 @@ struct Object* parameter(struct Object* formalParameter, struct parameters* stor
     parameterExpression = expression(storage); //получение выражения параметра
     if(parameterFormat(nextFormalParameter)) {
         Parameter(parameterExpression, nextFormalParameter->type, nextFormalParameter->class, storage); //todo
-        nextFormalParameter = nextFormalParameter->next; //переход к следующему параметру
+        nextFormalParameter = nextFormalParameter->nextObject; //переход к следующему параметру
     }
     else
         mark("Too many parameters", storage);
     return nextFormalParameter;
 
 }
-//+
-int parameterFormat(struct Object *obj) {
+
+int parameterFormat(struct Object *object) {
 
     //проверка, является ли объект допустимым параметром (проверка только формата)
     //параметр - Par либо Var. значение val - положительное, так как положительное смещение
-    return ((obj->class == ParGen) || ((obj->class == VarGen) && (obj->val > 0)));
+    return ((object->class == ParGen) || ((object->class == VarGen) && (object->value > 0)));
 
 }
-//+
+
 struct Item* getSingleParameter(struct parameters *storage) {
 
     //получение выражения для глоб. процедур. ( ВЫРАЖЕНИЕ )
@@ -715,7 +710,7 @@ struct Item* getSingleParameter(struct parameters *storage) {
     return currentParameter;
 
 }
-//+
+
 void statements(struct parameters *storage) {
 
     //*оператор* {; *оператор*}
@@ -749,7 +744,7 @@ void statements(struct parameters *storage) {
                 bufferItem = expression(storage);
             } //если =, предполагаем, что пропущено :
             else if(currentItem->mode == ProcGen) { //если объект - процедура, то это ее вызов
-                parametersObject = currentObject->dsc; //получение формальных параметров процедуры. par - указатель на первый
+                parametersObject = currentObject->previousScope; //получение формальных параметров процедуры. par - указатель на первый
                 if(storage->lastLexemeCode == lparenLexical) { //procedure(params)
                     get(storage);
                     if(storage->lastLexemeCode == rparenLexical)
@@ -768,7 +763,7 @@ void statements(struct parameters *storage) {
                         } while((storage->lastLexemeCode != rparenLexical) && (storage->lastLexemeCode < semicolonLexical));
                     }
                 }
-                if(currentObject->val < 0)
+                if(currentObject->value < 0)
                     mark("Forward procedure call", storage); //если вызов процедуры todo
                 else if(!parameterFormat(parametersObject)) //если все параметры корректны - запись вызова процедуры
                     Call(currentItem, storage);
@@ -776,7 +771,7 @@ void statements(struct parameters *storage) {
                     mark("Too few parameters", storage); //иначе - ошибка
             }
             else if(currentItem->mode == SProcGen) { //если одна из объявленных в universe процедур: Read, Write, WriteHex, WriteLn
-                if(currentObject->val <= 3) //для каждой процедуры свое значение: 1, 2, 3, 4. Для 1, 2, 3 есть аргументы,
+                if(currentObject->value <= 3) //для каждой процедуры свое значение: 1, 2, 3, 4. Для 1, 2, 3 есть аргументы,
                     bufferItem = getSingleParameter(storage); //для WriteLn - нет. здесь получаем аргумент
                 IOCall(currentItem, bufferItem, storage); //запись вызова
             }
@@ -823,7 +818,7 @@ void statements(struct parameters *storage) {
         }
         else if(storage->lastLexemeCode == whileLexical) { //WHILE *cond* DO *statements* END
             get(storage);
-            jumpLevel = storage->pc; //todo
+            jumpLevel = storage->PC; //todo
             currentItem = expression(storage); //получаем условие
             CJump(currentItem, storage); //todo
             if(storage->lastLexemeCode == doLexical)
@@ -847,13 +842,13 @@ void statements(struct parameters *storage) {
     } while((storage->lastLexemeCode <= identLexical) || (storage->lastLexemeCode == ifLexical) || (storage->lastLexemeCode == whileLexical));
 
 }
-//+
+
 void closeScope(struct parameters* storage) {
 
-    storage->topScope = storage->topScope->dsc; //возврат к предыдущему scope
+    storage->topScope = storage->topScope->previousScope; //возврат к предыдущему scope
 
 }
-//+
+
 void module(struct parameters* storage) {
 
     char moduleId[identLength] = "\0"; //название модуля
@@ -877,7 +872,7 @@ void module(struct parameters* storage) {
             get(storage);
         else
             mark(";?", storage);
-        varSize = declarations(storage, varSize); //читаем объявления CONST, TYPE, VAR. varSize += их размер
+        varSize = declarations(storage, varSize); //читаем объявления CONST, TYPE, VAR. varSize += их размер +++
         while(storage->lastLexemeCode == procedureLexical) { //читаем процедуры
             procedureAnalyzer(storage);
             if(storage->lastLexemeCode == semicolonLexical)
@@ -885,7 +880,7 @@ void module(struct parameters* storage) {
             else
                 mark(";?", storage); //PROCEDURE procbody; !
         }
-        Header(varSize, storage); //todo
+        Header(varSize, storage); //пролог. запись точки входа и указателя на вершину стека
         if(storage->lastLexemeCode == beginLexical) { //начало модуля
             get(storage);
             statements(storage); //анализ последовательности операторов
@@ -906,7 +901,7 @@ void module(struct parameters* storage) {
             mark(".?", storage); //MODULE *ident*.
         closeScope(storage); //закрытие universe
         if(!storage->error) { //если не было ошибок - генерируем код
-            Close(storage);
+            Close(storage); //эпилог. возврат вершины стека
             signal("Code generated.", storage);
         }
     }
@@ -915,8 +910,8 @@ void module(struct parameters* storage) {
     }
 
 }
-//+
-void Compile(char* sourceCode) {
+
+void compile(char *sourceCode) {
 
     struct parameters* storage =
             (struct parameters*)malloc(sizeof(struct parameters));
@@ -929,4 +924,3 @@ void Compile(char* sourceCode) {
     decode(storage);
 
 }
-//+

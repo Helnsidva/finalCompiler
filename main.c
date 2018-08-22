@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         inputFileName = argv[1];
         sourceCode = readCode(inputFileName);
         if(sourceCode != NULL) {
-            Compile(sourceCode); //начало
+            compile(sourceCode); //начало
         }
     }
     return 0;
