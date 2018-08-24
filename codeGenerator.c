@@ -120,11 +120,9 @@ struct Item* MakeItem(struct Object* y, struct parameters* storage) {
         x->storage = storage->PC;
     else if(y->level == storage->currentLevel)
         x->storage = FPGen;
-    else {
-        mark("level!", storage);
+    else
         x->storage = 0;
-    }
-    if(y->class = ParGen) {
+    if(y->class == ParGen) {
         r = GetReg(storage);
         Put(LDWGen, r, x->storage, x->a, storage);
         x->mode = VarGen;
@@ -545,10 +543,11 @@ void decode(struct parameters* storage) {
 
 void Parameter(struct Item* x, struct Type* ftyp, int class, struct parameters* storage) {
 
-    int r;
+    //запись фактических передаваемый параметров функции в стек
+    int r = 0;
     if(x->type == ftyp) {
-        if(class == ParGen) {
-            if(x->mode == VarGen) {
+        if(class == ParGen) { //если параметр - переменная
+            if(x->mode == VarGen) { //переменная - только var!
                 if(x->a != 0) {
                     r = GetReg(storage);
                     Put(ADDIGen, r, x->storage, x->a, storage);
@@ -558,7 +557,7 @@ void Parameter(struct Item* x, struct Type* ftyp, int class, struct parameters* 
             }
             else
                 mark("Illegal parameter mode", storage);
-            Put(PSHGen, r, SPGen, 4, storage);
+            Put(PSHGen, r, SPGen, 4, storage); //кладем ссылку на переменную в стек
             storage->registers[r] = 0;
         }
         else {
