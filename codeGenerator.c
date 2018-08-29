@@ -1,150 +1,140 @@
 #include <malloc.h>
-#include <math.h>
 #include <string.h>
 #include <stdio.h>
-
 #include "scanner.h"
 #include "codeGenerator.h"
 
-int ASH(int a, int b) {
+void testRange(int x, struct parameters *storage) {
 
-    return a * pow(2, b);
+    //проверка на переполнение
+    if((x >= 0x20000) || (x < -0x20000))
+        mark("Value is too large", storage);
 
 }
 
-void TestRange(int x, struct parameters* storage) {
-
-    if((x >= 0x20000) || (x < -0x20000))
-        mark("value is too large", storage);
-
-} //F1, F2: test im. a - 4, b - 4, im - 18
-
-void Put(int op, int a, int b, int c, struct parameters* storage) {
+void put(int command, int a, int b, int c, struct parameters *storage) {
 
     //запись сгенерированной команды
-    int pc = storage->PC; //получение счетчика команд
-    if(pc < maxCodeSize) { //если номер команды не привышает максимально допустимой длины кода
-        storage->code[pc] = (struct machineCommand*)malloc(sizeof(struct machineCommand));
-        storage->code[pc]->command = op;
-        storage->code[pc]->a = a;
-        storage->code[pc]->b = b;
-        storage->code[pc]->c = c; //выделение памяти и запись параметров
-        storage->PC++; //увеличение счетчика команд
-    }
-    else
-        mark("Too large code", storage);
+    //первые 5 бит - команда, след. 4 бита - a, след. 4 бита - b, след. 18 - c
+    if(command >= 32)
+        command -= 64; //если команда больше 5 бит. в декодере учитывается знак
+    storage->code[storage->PC] = (((command << 4 | a) << 4 | b) << 18) | (c & 0x3FFFF);
+    storage->PC++;
 
 }
 
-int GetReg(struct parameters* storage) {
+int getReg(struct parameters *storage) {
 
-    int i = 0;
-    while((i < FPGen) && (storage->registers[i] == 1))
-        i++;
-    storage->registers[i] = 1;
-    return i;
+    //получение свободного регистра
+    int newReg = 0;
+    while((newReg < FPGen) && (storage->registers[newReg] == 1))
+        newReg++;
+    storage->registers[newReg] = 1;
+    return newReg;
 
 }
 
-void load(struct Item* x, struct parameters* storage) {
+void load(struct item* x, struct parameters* storage) {
 
-    int r;
-    if(x->mode == VarGen) {
+    //загрузка в регистр
+    if(x->mode == VarGen) { //загрузка переменной
+        int r = getReg(storage); //получение регистра
         if(x->level == 0)
-            x->a -= storage->PC * 4;
-        r = GetReg(storage);
-        Put(LDWGen, r, x->storage, x->a, storage);
+            x->a -= storage->PC * 4; //если это глобальные переменные, то увеличение сдвига относительно базового адреса
+        put(LDWGen, r, x->storage, x->a, storage); //загрузка в регистр значения переменной
         storage->registers[x->storage] = 0;
-        x->storage = r;
+        x->storage = r; //обнуление регистра, в кот. хранился адрес переменной
     }
-    else if(x->mode == ConstGen) {
-        TestRange(x->a, storage);
-        x->storage = GetReg(storage);
-        Put(MOVIGen, x->storage, 0, x->a, storage);
+    else if(x->mode == ConstGen) { //загрузка константы
+        testRange(x->a, storage); //проверка на переполнение
+        x->storage = getReg(storage); //получение регистра
+        put(MOVIGen, x->storage, 0, x->a, storage); //загрузка константы в регистр
     }
-    x->mode = RegGen;
+    x->mode = RegGen; //mode - загружен в регистр
 
 }
 
-void Index(struct Item* x, struct Item* y, struct parameters* storage) {
+void arrayElem(struct item *arrayVar, struct item *index, struct parameters *storage) {
 
-    if(y->type != storage->intType)
-        mark("index is not integer", storage);
-    //x[y]
-    if(y->mode == ConstGen) {
-        if((y->a < 0) || (y->a >= x->type->length))
-            mark("bad index", storage);
-        x->a += y->a * x->type->baseType->size;
+    //получение элемента массива
+    if(index->classType != storage->intType)
+        mark("Index is not an integer", storage); //индекс - только int
+    if(index->mode == ConstGen) { //если индекс - константа
+        if((index->a < 0) || (index->a >= arrayVar->classType->length))
+            mark("Bad index", storage);
+        arrayVar->a += index->a * arrayVar->classType->baseType->size; //смещение относительно адреса массива
     }
-    else {
-        if(y->mode != RegGen) {}
-            load(y, storage);
-        Put(CHKIGen, y->storage, 0, x->type->length, storage);
-        Put(MULIGen, y->storage, y->storage, x->type->baseType->size, storage);
-        Put(ADDGen, y->storage, x->storage, y->storage, storage);
-        storage->registers[x->storage] = 0;
-        x->storage = y->storage;
+    else { //если индекс - переменная
+        if(index->mode != RegGen)
+            load(index, storage); //если индекс не хранится в регистре - загрузка
+        put(CHKIGen, index->storage, 0, arrayVar->classType->length, storage); //обнуление индекса, если он больше допустимого
+        put(MULIGen, index->storage, index->storage, arrayVar->classType->baseType->size, storage); //получение смещения
+        put(ADDGen, index->storage, arrayVar->storage, index->storage, storage); //добавление адреса к смещению
+        storage->registers[arrayVar->storage] = 0;
+        arrayVar->storage = index->storage; //обнуление регистра элемента
     }
-    x->type = x->type->baseType;
+    arrayVar->classType = arrayVar->classType->baseType; //типа элемента - базовый тип массива
 
 }
 
-struct Object* FindField(struct Object* list, struct parameters* storage) {
+struct object* findField(struct object *list, struct parameters *storage) {
 
-    struct Object* obj = (struct Object*)malloc(sizeof(struct Object));
+    //поиск поля записи в scope записи
     strcpy(storage->guard->name, storage->lastLexeme);
     while(strcmp(list->name, storage->lastLexeme))
         list = list->nextObject;
-    obj = list;
-    return obj;
+    return list; //возврат либо поля, либо guard
 
 }
 
-void Field(struct Item* x, struct Object* y, struct parameters* storage) {
+void getField(struct item *record, struct object *field) {
 
-    x->a += y->value;
-    x->type = y->type;
+    //инициализация поля записи
+    record->a += field->value; //добавление смещения поля
+    record->classType = field->classType; //присваивание типа поля
 
 }
 
-struct Item* MakeItem(struct Object* y, struct parameters* storage) {
+struct item* makeItem(struct object *argObject, struct parameters *storage) {
 
-    int r = 0;
-    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
-    x->mode = y->class;
-    x->type = y->type;
-    x->level = y->level;
-    x->a = y->value;
-    x->b = 0;
-    if(y->level == 0)
-        x->storage = storage->PC;
-    else if(y->level == storage->currentLevel)
-        x->storage = FPGen;
+    //создание item из object
+    struct item* newItem = (struct item*)malloc(sizeof(struct item));
+    newItem->mode = argObject->class;
+    newItem->classType = argObject->classType;
+    newItem->level = argObject->level;
+    newItem->a = argObject->value;
+    newItem->b = 0;
+    if(argObject->level == 0)
+        newItem->storage = storage->PC; //если глобальная переменная
+    else if(argObject->level == storage->currentLevel)
+        newItem->storage = FPGen; //если локальная - указывает на базовый адрес процедуры
     else
-        x->storage = 0;
-    if(y->class == ParGen) {
-        r = GetReg(storage);
-        Put(LDWGen, r, x->storage, x->a, storage);
-        x->mode = VarGen;
-        x->storage = r;
-        x->a = 0;
+        newItem->storage = 0;
+    if(argObject->class == ParGen) { //если параметр процедуры
+        int reg = getReg(storage); //получени регистра для его хранения
+        put(LDWGen, reg, newItem->storage, newItem->a, storage); //загрузка в регистр параметра: баз. адрес + смещение
+        newItem->mode = VarGen;
+        newItem->storage = reg;
+        newItem->a = 0; //значение хранится в регистре. смещение - 0
     }
-    return x;
+    return newItem;
 
 }
 
-struct Item* MakeConstItem(struct Type* typ, int val, struct parameters* storage) {
+struct item* makeConstItem(struct type *typ, int val) {
 
-    struct Item* x = (struct Item*)malloc(sizeof(struct Item));
-    x->mode = ConstGen;
-    x->type = typ;
-    x->a = val;
-    return x;
+    //создание item-константы без загрузки в регистр
+    struct item* newItem = (struct item*)malloc(sizeof(struct item));
+    newItem->mode = ConstGen;
+    newItem->classType = typ;
+    newItem->a = val;
+    return newItem;
 
 }
 
 int negated(int cond) {
 
+    //для команд переходов. если число четное - возврат нечетного и наоборот
     if(cond % 2)
         return cond - 1;
     else
@@ -152,134 +142,135 @@ int negated(int cond) {
 
 }
 
-void loadBool(struct Item* x, struct parameters* storage) {
+void loadBool(struct item* x, struct parameters* storage) {
 
-    //тот же load, только с проверкой
-    if(x->type->type != BooleanGen)
-        mark("boolean?", storage);
+    //load с проверкой на тип boolean
+    //атрибуты cond: = 0; != 1; < 2; >= 3; <= 4; > 5
+    if(x->classType->classType != BooleanGen)
+        mark("Not a boolean type", storage);
     load(x, storage);
-    x->mode = CondGen;
-    x->a = 0;
+    x->mode = CondGen; //"режим" - логическое выражение
+    x->a = 0; //адрес незавершенной команды перехода
     x->b = 0;
-    x->c = 1;
+    x->c = 1; //по умолчанию для выражения атрубут !=
 
 }
 
-void PutBR(int op, int disp, struct parameters* storage) {
+void putJump(int command, int disp, struct parameters *storage) {
 
-    int pc = storage->PC; //получение счетчика команд
-    if(pc < maxCodeSize) { //если номер команды не привышает максимально допустимой длины кода
-        storage->code[pc] = (struct machineCommand*)malloc(sizeof(struct machineCommand));
-        storage->code[pc]->command = op;
-        storage->code[pc]->c = disp; //выделение памяти и запись параметров
-        storage->PC++; //увеличение счетчика команд
-    }
-    else
-        mark("Too large code", storage);
+    //запись команд перехода/сравнения
+    //первые 5 бит - команда, след. 26 - смещение
+    storage->code[storage->PC] = ((command - 0x40) << 26) | (disp & 0x3FFFFFF);
+    storage->PC++;
+
 
 }
 
-void fix(int at, int with, struct parameters* storage) {
+void fix(int commandIndex, int jumpAddress, struct parameters* storage) {
 
-    //storage->code[at] = (storage->code[at] / 0x400000) * 0x400000 + (with % 0x400000);
+    //запись адреса перехода в команду
+    storage->code[commandIndex] = (storage->code[commandIndex] & 0xFFC00000) | (jumpAddress & 0x3FFFFF);
 
 }
 
-void FixLink(int L, struct parameters* storage) {
+void fixLink(int jumpEntry, struct parameters *storage) {
 
-    int L1;
-    while(L != 0) {
-        //L1 = storage->code[L] % 0x40000;
-        fix(L, storage->PC - L, storage);
-        L = L1;
+    //запись адреса перехода для всех ответвлений
+    int nextJump;
+    while(jumpEntry != 0) {
+        nextJump = storage->code[jumpEntry] & 0x3FFFF; //следующее ответвление
+        fix(jumpEntry, storage->PC - jumpEntry, storage);
+        jumpEntry = nextJump;
     }
 
 }
 
-void Op1(int op, struct Item* x, struct parameters* storage) {
+void singleGenerate(int op, struct item *x, struct parameters *storage) {
 
-    int t;
-
-    if(op == minusLexical) {
-        if(x->type->type != IntegerGen)
-            mark("bad type", storage);
+    //генерация кода для выражений с одним аргументом. -x, ~x, x &, x |
+    if(op == minusLexical) { //если -x
+        if(x->classType->classType != IntegerGen)
+            mark("Type must be integer", storage); //отрицательный только int
         else if(x->mode == ConstGen)
-            x->a -= 2 * (x->a);
+            x->a = -(x->a); //если константа - просто отрицательное значение
         else {
             if(x->mode == VarGen)
-                load(x, storage);
-            Put(MVNGen, x->storage, 0, x->storage, storage);
+                load(x, storage); //если не загружена переменная - загрузка в регистр
+            put(MVNGen, x->storage, 0, x->storage, storage); //загрузка с реверс. знаком
         }
     }
-    else if(op == notLexical) {
+    else if(op == notLexical) { //если ~x
         if(x->mode != CondGen)
-            loadBool(x, storage);
-        x->c = negated(x->c);
+            loadBool(x, storage); //если не загружено в регист - загрузка
+        x->c = negated(x->c); //= меняется на != и наоборот
+        int t;
         t = x->a;
         x->a = x->b;
-        x->b = t;
+        x->b = t; //перестваление списков F- и T- переходов
     }
-    else if(op == andLexical) {
-        if(x->mode != CondGen) {}
-            loadBool(x, storage);
-        PutBR(BEQGen + negated(x->c), x->a, storage);
+    else if(op == andLexical) { //x &
+        if(x->mode != CondGen)
+            loadBool(x, storage); //загрузка в регистр
+        putJump(BEQGen + negated(x->c), x->a, storage); //переход дальше, если аргумент 1
         storage->registers[x->storage] = 0;
         x->a = storage->PC - 1;
-        FixLink(x->b, storage);
+        fixLink(x->b, storage); //запись адреса перехода
         x->b = 0;
     }
-    else if(op == orLexical) {
-        if(x->mode != CondGen) {}
-            loadBool(x, storage);
-        PutBR(BEQGen + x->c, x->b, storage);
+    else if(op == orLexical) { //x |
+        if(x->mode != CondGen)
+            loadBool(x, storage); //загрузка в регистр
+        putJump(BEQGen + x->c, x->b, storage); //переход дальше, если аргумент 0
         storage->registers[x->storage] = 0;
         x->b = storage->PC - 1;
-        FixLink(x->a, storage);
+        fixLink(x->a, storage); //запись адреса перехода
         x->a = 0;
     }
 
 }
 
-void PutOp(int cd, struct Item* x, struct Item* y, struct parameters* storage) {
+void putArith(int cd, struct item *x, struct item *y, struct parameters *storage) {
 
     if(x->mode != RegGen)
-        load(x, storage);
+        load(x, storage); //x - всегда в регистре
     if(y->mode == ConstGen) {
-        TestRange(y->a, storage);
-        Put(cd + 16, x->storage, x->storage, y->a, storage);
+        testRange(y->a, storage);
+        put(cd + 16, x->storage, x->storage, y->a, storage); //если y - константа, команда с I (E: MOVI)
     }
     else {
         if(y->mode != RegGen)
-            load(y, storage);
-        Put(cd, x->storage, x->storage, y->storage, storage);
-        storage->registers[y->storage] = 0;
+            load(y, storage); //иначе, y - в регистре
+        put(cd, x->storage, x->storage, y->storage, storage);
+        storage->registers[y->storage] = 0; //y освобождается
     }
 
 }
 
-int merged(int L0, int L1, struct parameters* storage) {
+int merged(int rightExp, int leftExp, struct parameters* storage) {
 
-    int L2, L3;
-    if(L0 != 0) {
-        L2 = L0;
-        while(L3 != 0) {
-            //L3 = storage->code[L2] % 0x40000;
-            if(L3 != 0)
-                L2 = L3;
-        }
-        storage->code[L2] = storage->code[L2] - L3 + L1;
-        return L0;
+    //соединение логических подвыражений
+    int rightBuff, secondBuff;
+    if(rightExp != 0) { //если правое выражение есть, анализируем его
+        rightBuff = rightExp;
+        do {
+            secondBuff = storage->code[rightBuff] & 0x3FFFF;
+            if(secondBuff != 0)
+                rightBuff = secondBuff;
+        } while(secondBuff != 0);
+        storage->code[rightBuff] = storage->code[rightBuff] - secondBuff + leftExp;
+        return rightExp;
     }
     else
-        return L1;
+        return leftExp;
 
 }
 
-void Op2(int op, struct Item* x, struct Item* y, struct parameters* storage) {
+void termGenerate(int op, struct item *x, struct item *y, struct parameters *storage) {
 
-    //x = x op y;
-    if((x->type->type == IntegerGen) && (y->type->type == IntegerGen)) {
-        if((x->mode == ConstGen) && (y->mode == ConstGen)) {
+    //генерирование кода для выражения x op y;
+    //должны быть одинаковые типы!
+    if((x->classType->classType == IntegerGen) && (y->classType->classType == IntegerGen)) {
+        if((x->mode == ConstGen) && (y->mode == ConstGen)) { //две константы. в регистрах не хранятся
             if(op == plusLexical)
                 x->a += y->a;
             else if(op == minusLexical)
@@ -291,207 +282,217 @@ void Op2(int op, struct Item* x, struct Item* y, struct parameters* storage) {
             else if(op == modLexical)
                 x->a = x->a % y->a;
             else
-                mark("bad type", storage);
+                mark("Bad expression operator", storage);
         }
-        else {
+        else { //если не константы - хранится в регистарах
             if(op == plusLexical)
-                PutOp(ADDGen, x, y, storage);
+                putArith(ADDGen, x, y, storage);
             else if(op == minusLexical)
-                PutOp(SUBGen, x, y, storage);
+                putArith(SUBGen, x, y, storage);
             else if(op == timesLexical)
-                PutOp(MULGen, x, y, storage);
+                putArith(MULGen, x, y, storage);
             else if(op == divLexical)
-                PutOp(DIVGen, x, y, storage);
+                putArith(DIVGen, x, y, storage);
             else if(op == modLexical)
-                PutOp(MODGen, x, y, storage);
+                putArith(MODGen, x, y, storage);
             else
-                mark("bad type", storage);
+                mark("Bad expression operator", storage);
         }
     }
-    else if((x->type->type == BooleanGen) && (y->type->type == BooleanGen)) {
+    else if((x->classType->classType == BooleanGen) && (y->classType->classType == BooleanGen)) {
         if(y->mode != CondGen)
-            loadBool(y, storage);
+            loadBool(y, storage); //второй аргумент - в регистр
         if(op == orLexical) {
             x->a = y->a;
-            x->b = merged(y->b, x->b, storage);
+            x->b = merged(y->b, x->b, storage); //соединение логических подвыражений
             x->c = y->c;
         }
         else if(op == andLexical) {
-            x->a = merged(y->a, x->a, storage);
+            x->a = merged(y->a, x->a, storage); //соединение логических подвыражений
             x->b = y->b;
             x->c = y->c;
         }
     }
     else
-        mark("bad type", storage);
+        mark("Bad types", storage);
 
 }
 
-void Relation(int op, struct Item* x, struct Item* y, struct parameters* storage) {
+void relation(int op, struct item *x, struct item *y, struct parameters *storage) {
 
-    if((x->type->type != IntegerGen) || (y->type->type != IntegerGen))
-        mark("bad type", storage);
+    //генерирование кода для выражения сравнения
+    if((x->classType->classType != IntegerGen) || (y->classType->classType != IntegerGen))
+        mark("Must be integer type", storage); //аргументы - только int
     else {
-        PutOp(CMPGen, x, y, storage);
-        x->c = op - eqlLexical;
+        putArith(CMPGen, x, y, storage); //команда сравнения
+        x->c = op - eqlLexical; //код сравнения (есть в loadBool)
         storage->registers[y->storage] = 0;
     }
     x->mode = CondGen;
-    x->type = storage->boolType;
+    x->classType = storage->boolType; //результат сравнения - boolean
     x->a = 0;
     x->b = 0;
 
 }
 
-void IncLevel(int n, struct parameters* storage) {
+void changeLevel(int n, struct parameters *storage) {
 
+    //изменение уровня вложенности scope
     storage->currentLevel += n;
 
 }
 
-void Enter(int size, struct parameters* storage) {
+void prologue(int size, struct parameters *storage) {
 
-    Put(PSHGen, LNKGen, SPGen, 4, storage);
-    Put(PSHGen, FPGen, SPGen, 4, storage);
-    Put(MOVGen, FPGen, 0, SPGen, storage);
-    Put(SUBIGen, SPGen, SPGen, size, storage);
-
-}
-
-void Return(int size, struct parameters* storage) {
-
-    Put(MOVGen, SPGen, 0, FPGen, storage);
-    Put(POPGen, FPGen, SPGen, 4, storage);
-    Put(POPGen, LNKGen, SPGen, size + 4, storage);
-    PutBR(RETGen, LNKGen, storage);
+    //команды пролога. сохранение адреса возврата
+    put(PSHGen, LNKGen, SPGen, 4, storage);
+    put(PSHGen, FPGen, SPGen, 4, storage);
+    put(MOVGen, FPGen, 0, SPGen, storage);
+    put(SUBIGen, SPGen, SPGen, size, storage);
 
 }
 
-void Store(struct Item* x, struct Item* y, struct parameters* storage) { //x = y
+void epilogue(int size, struct parameters *storage) {
 
-    int r;
-    if((x->type->type == BooleanGen || x->type->type == IntegerGen) && (x->type->type == y->type->type)) {
-        if(y->mode == CondGen) {
-            Put(BEQGen + negated(y->c), y->storage, 0, y->a, storage);
+    //команды эпилога. возврат стека
+    put(MOVGen, SPGen, 0, FPGen, storage);
+    put(POPGen, FPGen, SPGen, 4, storage);
+    put(POPGen, LNKGen, SPGen, size + 4, storage);
+    putJump(RETGen, LNKGen, storage);
+
+}
+
+void store(struct item *x, struct item *y, struct parameters *storage) {
+
+    //присваивание
+    if((x->classType->classType == BooleanGen || x->classType->classType == IntegerGen) && (x->classType->classType == y->classType->classType)) {
+        if(y->mode == CondGen) { //присваивание результата сравнения. x := y
+            put(BEQGen + negated(y->c), y->storage, 0, y->a, storage); //переход по лог. операции
             storage->registers[y->storage] = 0;
-            y->a = storage->PC - 1;
-            FixLink(y->b, storage);
-            y->storage = GetReg(storage);
-            Put(MOVIGen, y->storage, 0, 1, storage);
-            PutBR(BRGen, 2, storage);
-            FixLink(y->a, storage);
-            Put(MOVIGen, y->storage, 0, 0, storage);
+            y->a = storage->PC - 1; //переход, если истинно
+            fixLink(y->b, storage); //запись адреса перехода, если не истинно
+            y->storage = getReg(storage);
+            put(MOVIGen, y->storage, 0, 1, storage); //загрузка истинного значения
+            putJump(BRGen, 2, storage); //переход
+            fixLink(y->a, storage);
+            put(MOVIGen, y->storage, 0, 0, storage); //загрузка ложного значения
         }
         else if(y->mode != RegGen)
-            load(y, storage);
+            load(y, storage); //если y не в регистре - в регистр
         if(x->mode == VarGen) {
             if(x->level == 0)
                 x->a = x->a - (storage->PC) * 4;
-            Put(STWGen, y->storage, x->storage, x->a, storage);
+            put(STWGen, y->storage, x->storage, x->a, storage); //если x переменная - сохранение в памяти
         }
         else
-            mark("illegal assignment", storage);
+            mark("Illegal assignment", storage);
         storage->registers[x->storage] = 0;
-        storage->registers[y->storage] = 0;
+        storage->registers[y->storage] = 0; //освобождение регистров, так как переменная уже в памяти
     }
     else
-        mark("incompatible assignment", storage);
+        mark("Incompatible assignment", storage);
 
 }
 
-void Call(struct Item* x, struct parameters* storage) {
+void procedureCall(struct item *x, struct parameters *storage) {
 
-    PutBR(BSRGen, x->a - storage->PC, storage);
+    //вызов процедуры
+    putJump(BSRGen, x->a - storage->PC, storage);
 
 }
 
-void IOCall(struct Item* x, struct Item* y, struct parameters* storage) {
+void globalCall(struct item *x, struct item *y, struct parameters *storage) {
 
-    struct Item* z = (struct Item*)malloc(sizeof(struct Item));
+    //вызов глобальных процедур
+    struct item* z = (struct item*)malloc(sizeof(struct item));
     if(x->a < 4) {
-        if(y->type->type != IntegerGen)
-            mark("Integer?", storage);
-    }
+        if(y->classType->classType != IntegerGen)
+            mark("Argument must be integer", storage);
+    } //read, write, writehex - аргумент integer
     if(x->a == 1) { //read
-        z->storage = GetReg(storage);
+        z->storage = getReg(storage);
         z->mode = RegGen;
-        z->type = storage->intType;
-        Put(RDGen, z->storage, 0, 0, storage);
-        Store(y, z, storage);
+        z->classType = storage->intType;
+        put(RDGen, z->storage, 0, 0, storage);
+        store(y, z, storage); //в регистр значение аргумента
     }
     else if(x->a == 2) { //write
         load(y, storage);
-        Put(WRDGen, 0, 0, y->storage, storage);
-        storage->registers[y->storage] = 0;
+        put(WRDGen, 0, 0, y->storage, storage);
+        storage->registers[y->storage] = 0; //печать числа
     }
     else if(x->a == 3) { //writehex
         load(y, storage);
-        Put(WRHGen, 0, 0, y->storage, storage);
-        storage->registers[y->storage] = 0;
+        put(WRHGen, 0, 0, y->storage, storage);
+        storage->registers[y->storage] = 0; //печать числа в формате 0x
     }
     else //writeln
-        Put(WRLGen, 0, 0, 0, storage);
+        put(WRLGen, 0, 0, 0, storage); //печать \n
 
 }
 
-void CJump(struct Item* x, struct parameters* storage) {
+void falseJump(struct item *x, struct parameters *storage) {
 
-    if(x->type->type == BooleanGen) {
+    //переход, если условие не выполняется
+    if(x->classType->classType == BooleanGen) {
         if(x->mode != CondGen)
-            loadBool(x, storage);
-        PutBR(BEQGen + negated(x->c), x->a, storage);
+            loadBool(x, storage); //загрузка в регистр
+        putJump(BEQGen + negated(x->c), x->a, storage); //переход
         storage->registers[x->storage] = 0;
-        FixLink(x->b, storage);
+        fixLink(x->b, storage); //запись адреса перехода
         x->a = storage->PC - 1;
     }
     else {
-        mark("Boolean?", storage);
+        mark("Not boolean type", storage);
         x->a = storage->PC;
     }
 
 }
 
-void BJump(int L, struct parameters* storage) {
+void whileJump(int retAddress, struct parameters *storage) {
 
-    PutBR(BRGen, L - storage->PC, storage);
-
-}
-
-int FJump(int L, struct parameters* storage) {
-
-    int retL;
-    PutBR(BRGen, L, storage);
-    retL = storage->PC - 1;
-    return retL;
+    //безусловный переход в конце цикла while
+    putJump(BRGen, retAddress - storage->PC, storage);
 
 }
 
-void Header(int size, struct parameters* storage) {
+int elseJump(int retAddress, struct parameters *storage) {
 
-    storage->entryAddress = storage->PC;
-    Put(MOVIGen, SPGen, 0, 1024 - size, storage); //todo RISC.Memsize
-    Put(PSHGen, LNKGen, SPGen, 4, storage);
+    //переход для elsif/else
+    int newAddress;
+    putJump(BRGen, retAddress, storage);
+    newAddress = storage->PC - 1;
+    return newAddress;
 
 }
 
-void Close(struct parameters* storage) {
+void codeHeader(int size, struct parameters *storage) {
 
-    Put(POPGen, LNKGen, SPGen, 4, storage);
-    PutBR(RETGen, LNKGen, storage);
+    //запись пролога программы
+    storage->entryAddress = storage->PC; //сохранение точки входа
+    put(MOVIGen, SPGen, 0, 1024 - size, storage); //вершина стека = память машины - память глоб. переменных
+    put(PSHGen, LNKGen, SPGen, 4, storage); //сохранение адреса вершины стека
+
+}
+
+void codeEnding(struct parameters *storage) {
+
+    //конец кода.
+    put(POPGen, LNKGen, SPGen, 4, storage);
+    putJump(RETGen, LNKGen, storage);
 
 }
 
 void decode(struct parameters* storage) {
 
-    //запись кода в файл
-    int i;
+    //декордер, запись кода в файл
     FILE* outputFile = NULL;
     printf("Recording compiled code...\n");
     if((outputFile = fopen("output.txt", "wb")) == NULL) {
         printf("Opening output file error!\n");
         fprintf(storage->reportFile, "Opening output file error!\r\n");
         return;
-    }
+    } //открытие output.txt
     char mnemo[64][6];
     strcpy(mnemo[MOVGen], "MOV ");
     strcpy(mnemo[MVNGen], "MVN ");
@@ -528,43 +529,66 @@ void decode(struct parameters* storage) {
     strcpy(mnemo[RDGen], "READ ");
     strcpy(mnemo[WRDGen], "WRD ");
     strcpy(mnemo[WRHGen], "WRH ");
-    strcpy(mnemo[WRLGen], "WRL ");
+    strcpy(mnemo[WRLGen], "WRL "); //заполнение массива кодов команд
     fprintf(outputFile, "entry %d\r\n", storage->entryAddress * 4);
-    for(i = 0; i < storage->PC; i++) {
-        fprintf(outputFile, "%d %s", 4 * i, mnemo[storage->code[i]->command]);
-        if(storage->code[i]->command < BEQGen)
-            fprintf(outputFile, "%d, %d, ", storage->code[i]->a, storage->code[i]->b);
-        fprintf(outputFile, "%d\r\n", storage->code[i]->c);
+    for(int i = 0; i < storage->PC; i++) {
+        int codeCommand = storage->code[i];
+        int command = (codeCommand >> 26) & 0x3F; //получение первых 5 бит - команда
+        fprintf(outputFile, "%d %s", 4 * i, mnemo[command]);
+        if(command < MOVIGen) {
+            //c - регистр
+            fprintf(outputFile, "%d, %d, %d\r\n", (codeCommand >> 22) & 0x0F, (codeCommand >> 18) & 0x0F,
+                    codeCommand & 0x0F); //a - след. 4 бита, b - след. 4 бита, c - след. 18 бит
+        }
+        else if(command < BEQGen) {
+            //c - константа либо смещение
+            int c = codeCommand & 0x3FFFF;
+            if(c >= 0x20000)
+                c -= 0x40000; //если смещение - должно быть отрицательным
+            fprintf(outputFile, "%d, %d, %d\r\n", (codeCommand >> 22) & 0x0F, (codeCommand >> 18) & 0x0F, c);
+        }
+        else {
+            int c = codeCommand & 0x3FFFFFF;
+            if(command == RETGen)
+                fprintf(outputFile, "%d\r\n", c); //c - регистр
+            else {
+                //c - смещение
+                if(c >= 0x2000000)
+                    c -= 0x4000000;
+                fprintf(outputFile, "%d\r\n", c * 4);
+            }
+        }
     }
+    fprintf(outputFile, "%d bytes\r\n", storage->PC * 4);
     fclose(outputFile);
     printf("Compiled code is in the \"output.txt\" file in the current directory. Bye!\n");
 
 }
 
-void Parameter(struct Item* x, struct Type* ftyp, int class, struct parameters* storage) {
+void parameterGen(struct item *x, struct type *ftyp, int class, struct parameters *storage) {
 
-    //запись фактических передаваемый параметров функции в стек
-    int r = 0;
-    if(x->type == ftyp) {
-        if(class == ParGen) { //если параметр - переменная
-            if(x->mode == VarGen) { //переменная - только var!
+    //запись фактических передаваемых параметров функции в стек
+    if(x->classType == ftyp) { //если параметр верный
+        if(class == ParGen) { //если параметр-ссылка
+            int reg = 0;
+            if(x->mode == VarGen) { //параметр-ссылка - только var!
                 if(x->a != 0) {
-                    r = GetReg(storage);
-                    Put(ADDIGen, r, x->storage, x->a, storage);
+                    reg = getReg(storage);
+                    put(ADDIGen, reg, x->storage, x->a, storage); //если параметр еще не загружен в регистр в scope
                 }
                 else
-                    r = x->storage;
+                    reg = x->storage; //если загружен - берется этот регистр
             }
             else
                 mark("Illegal parameter mode", storage);
-            Put(PSHGen, r, SPGen, 4, storage); //кладем ссылку на переменную в стек
-            storage->registers[r] = 0;
+            put(PSHGen, reg, SPGen, 4, storage); //ссылка на переменную - в стек
+            storage->registers[reg] = 0; //обнуление регистра
         }
-        else {
+        else { //если параметр-значение
             if(x->mode != RegGen)
-                load(x, storage);
-            Put(PSHGen, x->storage, SPGen, 4, storage);
-            storage->registers[x->storage] = 0;
+                load(x, storage); //загрузка в регистр
+            put(PSHGen, x->storage, SPGen, 4, storage); //загрузка в стек
+            storage->registers[x->storage] = 0; //обнуление регистра
         }
     }
     else

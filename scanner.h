@@ -1,5 +1,6 @@
 #include "parser.h"
 
+//терминальные символы
 #define nullLexical 0
 #define timesLexical 1
 #define divLexical 3

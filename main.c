@@ -4,8 +4,10 @@
 
 char* readCode(char* fileName) {
 
+    //чтение исходного кода из файла
+    //TODO ПОМЕНЯТЬ ИМЯ НА НОРМАЛЬНОЕ
     FILE* sourceFile = NULL;
-    int fileSize = 0;
+    int fileSize = 0; //размер входного файла. нужен чтобы знать количество считываемых символов
     char* sourceCode;
     printf("Oberon-0 Compiler 1.0\n");
     printf("Opening source code file...\n");
@@ -16,10 +18,10 @@ char* readCode(char* fileName) {
     printf("Reading source code...\n");
     fseek(sourceFile, 0, SEEK_END);
     fileSize = ftell(sourceFile);
-    rewind(sourceFile); //get file size
+    rewind(sourceFile); //возвращаемся в началу файла
     sourceCode = (char*)malloc((fileSize + 1) * sizeof(char));
     fread(sourceCode, sizeof(char), fileSize, sourceFile);
-    sourceCode[fileSize] = '\0'; //get source code
+    sourceCode[fileSize] = '\0';
     fclose(sourceFile);
     return sourceCode;
 
@@ -27,6 +29,7 @@ char* readCode(char* fileName) {
 
 void manual() {
 
+    //печать информации о программе и аргументах
     printf("Oberon-0 Compiler 1.0.\n\n");
     printf("Invalid command line format!\n");
     printf("Correct format: \"Oberon-0-Compiler.exe source.txt\", where \"source.txt\" - file with source code in the Oberon-0 language.\n");
@@ -38,16 +41,16 @@ void manual() {
 
 int main(int argc, char* argv[]) {
 
-    char* sourceCode = NULL;
-    char* inputFileName = NULL;
-    if(argc != 2) {
-        manual();
-    }
+    //вид командной строки: compiler.exe имя_входного_файла
+    if(argc != 2)
+        manual(); //печать информации о программе и аргументах
     else {
+        char* inputFileName = NULL; //имя входного файла
+        char* sourceCode = NULL; //исходный код
         inputFileName = argv[1];
-        sourceCode = readCode(inputFileName);
+        sourceCode = readCode(inputFileName); //чтение исходного кода из файла
         if(sourceCode != NULL) {
-            compile(sourceCode); //начало
+            compile(sourceCode); //если код считан успешно - начало компиляции
         }
     }
     return 0;

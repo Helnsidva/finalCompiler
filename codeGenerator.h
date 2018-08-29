@@ -1,4 +1,4 @@
-//class / mode numb identifiers
+//классы, режимы
 #define HeadGen 0
 #define VarGen 1
 #define ParGen 2
@@ -10,13 +10,13 @@
 #define RegGen 10
 #define CondGen 11
 
-//types numb identifiers
+//идентификаторы типов
 #define BooleanGen 0
 #define IntegerGen 1
 #define ArrayGen 2
 #define RecordGen 3
 
-//assembly commands numb identifiers
+//ассемблерные команды
 #define MOVGen 0
 #define MVNGen 1
 #define ADDGen 2
@@ -54,31 +54,30 @@
 #define BSRGen 57
 #define RETGen 58
 
-//reserved registers numb identifiers
+//зарезервированные регистры
 #define FPGen 12
 #define SPGen 13
 #define LNKGen 14
-#define PCGen 15
 
-void Index(struct Item*, struct Item*, struct parameters*);
-struct Object* FindField(struct Object*, struct parameters*);
-void Field(struct Item*, struct Object*, struct parameters*);
-struct Item* MakeItem(struct Object*, struct parameters*);
-struct Item* MakeConstItem(struct Type*, int, struct parameters*);
-void Op1(int, struct Item*, struct parameters*);
-void Op2(int, struct Item*, struct Item*, struct parameters*);
-void Relation(int, struct Item*, struct Item*, struct parameters*);
-void IncLevel(int, struct parameters*);
-void Enter(int, struct parameters*);
-void Return(int, struct parameters*);
-void FixLink(int, struct parameters*);
-void Store(struct Item*, struct Item*, struct parameters*);
-void Call(struct Item*, struct parameters*);
-void IOCall(struct Item*, struct Item*, struct parameters*);
-void CJump(struct Item*, struct parameters*);
-void BJump(int, struct parameters*);
-int FJump(int, struct parameters*);
-void Header(int, struct parameters*);
-void Close(struct parameters*);
+void arrayElem(struct item *, struct item *, struct parameters *);
+struct object* findField(struct object *, struct parameters *);
+void getField(struct item *, struct object *);
+struct item* makeItem(struct object *, struct parameters *);
+struct item* makeConstItem(struct type *, int);
+void singleGenerate(int, struct item *, struct parameters *);
+void termGenerate(int, struct item *, struct item *, struct parameters *);
+void relation(int, struct item *, struct item *, struct parameters *);
+void changeLevel(int, struct parameters *);
+void prologue(int, struct parameters *);
+void epilogue(int, struct parameters *);
+void fixLink(int, struct parameters *);
+void store(struct item *, struct item *, struct parameters *);
+void procedureCall(struct item *, struct parameters *);
+void globalCall(struct item *, struct item *, struct parameters *);
+void falseJump(struct item *, struct parameters *);
+void whileJump(int, struct parameters *);
+int elseJump(int, struct parameters *);
+void codeHeader(int, struct parameters *);
+void codeEnding(struct parameters *);
 void decode(struct parameters*);
-void Parameter(struct Item*, struct Type*, int, struct parameters*);
+void parameterGen(struct item *, struct type *, int, struct parameters *);
