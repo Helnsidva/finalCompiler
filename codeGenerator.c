@@ -7,7 +7,7 @@
 void testRange(int x, struct parameters *storage) {
 
     //проверка на переполнение
-    if((x >= 0x20000) || (x < -0x20000))
+    if((x >= 0x20000) || (x < -0x20000)) //131072
         mark("Value is too large", storage);
 
 }
@@ -257,7 +257,7 @@ int merged(int rightExp, int leftExp, struct parameters* storage) {
             if(secondBuff != 0)
                 rightBuff = secondBuff;
         } while(secondBuff != 0);
-        storage->code[rightBuff] = storage->code[rightBuff] - secondBuff + leftExp;
+        storage->code[rightBuff] = storage->code[rightBuff] + leftExp;
         return rightExp;
     }
     else
@@ -544,7 +544,7 @@ void decode(struct parameters* storage) {
             //c - константа либо смещение
             int c = codeCommand & 0x3FFFF;
             if(c >= 0x20000)
-                c -= 0x40000; //если смещение - должно быть отрицательным
+                c -= 0x40000; //если смещение
             fprintf(outputFile, "%d, %d, %d\r\n", (codeCommand >> 22) & 0x0F, (codeCommand >> 18) & 0x0F, c);
         }
         else {
@@ -565,7 +565,7 @@ void decode(struct parameters* storage) {
 
 }
 
-void parameterGen(struct item *x, struct type *ftyp, int class, struct parameters *storage) {
+void parameterGen(struct item *x, struct type *ftyp, struct parameters *storage) {
 
     //запись фактических передаваемых параметров функции в стек
     if(x->classType == ftyp) { //если параметр верный

@@ -81,4 +81,4 @@ int elseJump(int, struct parameters *);
 void codeHeader(int, struct parameters *);
 void codeEnding(struct parameters *);
 void decode(struct parameters*);
-void parameterGen(struct item *, struct type *, int, struct parameters *);
+void parameterGen(struct item *, struct type *, struct parameters *);

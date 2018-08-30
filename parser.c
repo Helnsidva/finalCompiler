@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <time.h>
 #include "scanner.h"
 #include "codeGenerator.h"
 
@@ -672,8 +673,8 @@ struct object* parametersMatch(struct object *formalParameter, struct parameters
     nextFormalParameter = formalParameter;
     parameterExpression = expression(storage); //получение выражения параметра
     if(parameterFormat(nextFormalParameter)) { //если параметр корректен
-        parameterGen(parameterExpression, nextFormalParameter->classType, nextFormalParameter->class, storage); //запись параметра в стек
-        nextFormalParameter = nextFormalParameter->nextObject; //переход к следующему параметру
+        parameterGen(parameterExpression, nextFormalParameter->classType, storage); //запись параметра в стек
+        nextFormalParameter = nextFormalParameter->nextObject; //переход к след. параметру
     }
     else
         mark("Wrong parameters", storage);
@@ -854,13 +855,12 @@ int module(struct parameters* storage) {
         char moduleName[identLength] = "\0"; //название модуля
         int varSize = 0; //размер памяти для глобальных переменных
         get(storage);
-        openScope(storage); //открытие universe
+        openScope(storage); //открытие нового scope
         if(storage->lastLexemeCode == identLexical) { //MODULE *ident*
             strcpy(moduleName, storage->lastLexeme);
-            char recordingString[identLength + 17] = "Compiles module "; //строка для вывода signal
-            strcat(recordingString, moduleName);
-            strcat(recordingString, ".");
-            signal(recordingString, storage); //"Compiles module moduleName."
+            //"Compiles module moduleName."
+            fprintf(storage->reportFile, "Compiles module %s.\r\n", moduleName);
+            printf("Compiles module %s.\n", moduleName);
             get(storage);
         }
         else
@@ -909,7 +909,7 @@ int module(struct parameters* storage) {
 }
 
 void compile(char *sourceCode) {
-    
+
     struct parameters* storage =
             (struct parameters*)malloc(sizeof(struct parameters));
     if(init(storage, sourceCode) != 0)

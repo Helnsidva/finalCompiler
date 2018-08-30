@@ -40,6 +40,7 @@ void manual() {
 
 int main(int argc, char* argv[]) {
 
+
     //вид командной строки: compiler.exe имя_входного_файла
     if(argc != 2)
         manual(); //печать информации о программе и аргументах
