@@ -45,8 +45,8 @@ void enterKeyTab(int symbol, char *name, struct symbolLex **keyTab, int *index) 
 void initLexical(struct parameters *storage) {
 
     //инициализация структуры для сканнера
-    int i = 0;
-    for(i; i < 34; i++)
+    int i;
+    for(i = 0; i < 34; i++)
         storage->keyTab[i] = (struct symbolLex*)malloc(sizeof(struct symbolLex));
     i = 0;
     enterKeyTab(nullLexical, "BY", storage->keyTab, &i);
@@ -141,6 +141,13 @@ int init(struct parameters* storage, char* sourceCode) {
         printf("Opening report.txt file error!\n");
         return -1;
     }
+    FILE* outputFile = NULL;
+    if((outputFile = fopen("output.txt", "wb")) == NULL) {
+        printf("Opening output.txt file error!\n");
+        return -1;
+    }
+    else
+        fclose(outputFile); //очистка файла output.txt
     initLexical(storage); //инициализация keyTab
     storage->currentLevel = 0;
     storage->PC = 0;
@@ -150,6 +157,8 @@ int init(struct parameters* storage, char* sourceCode) {
     for(int i = 0; i < maxCodeSize; i++)
         storage->code[i] = 0;
     storage->entryAddress = 0;
+    storage->posCounter = 0;
+    storage->linesCounter = 0;
     return 0;
 
 }
@@ -547,12 +556,7 @@ int parametersBlockAnalyzer(struct parameters *storage) {
     struct type* currentType; //тип параметров
     int typeSize; //размер типа
     int parametersSize = 0; //размер блока
-    if(storage->lastLexemeCode == varLexical) { //[VAR] ??? : ???
-        get(storage);
-        listHead = identifiersList(ParGen, storage); //чтение списка объектов-ссылок
-    }
-    else
-        listHead = identifiersList(VarGen, storage); //если VAR - VarGen, - параметр-значение. Иначе - ссылка - ParGen
+    listHead = identifiersList(VarGen, storage); //VAR - VarGen, - параметр-значение
     if(storage->lastLexemeCode == identLexical) { //ident - тип переменных
         objectBuffer = findObject(storage); //поиск типа в существующих
         get(storage);
@@ -567,13 +571,9 @@ int parametersBlockAnalyzer(struct parameters *storage) {
         mark("Identifier type?", storage);
         currentType = storage->intType; //если тип не указан - присваивание int
     }
-    if(listHead->class == VarGen) { //если параметры-ссылки
-        typeSize = currentType->size;
-        if(currentType->classType >= ArrayGen)
-            mark("Incorrect type of var parameters", storage); //параметром var может быть только int и bool
-    }
-    else
-        typeSize = wordSize; //если не var -  размер = 4
+    typeSize = currentType->size;
+    if(currentType->classType >= ArrayGen)
+        mark("Incorrect type of parameter", storage); //параметром может быть только int и bool
     objectBuffer = listHead;
     while(objectBuffer != storage->guard) { //инициализация типа для всех новых объектов. подсчет их размера
         objectBuffer->classType = currentType;

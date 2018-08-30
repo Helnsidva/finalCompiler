@@ -105,13 +105,13 @@ struct item* makeItem(struct object *argObject, struct parameters *storage) {
     newItem->a = argObject->value;
     newItem->b = 0;
     if(argObject->level == 0)
-        newItem->storage = storage->PC; //если глобальная переменная
+        newItem->storage = PCGen; //если глобальная переменная
     else if(argObject->level == storage->currentLevel)
         newItem->storage = FPGen; //если локальная - указывает на базовый адрес процедуры
     else
         newItem->storage = 0;
     if(argObject->class == ParGen) { //если параметр процедуры
-        int reg = getReg(storage); //получени регистра для его хранения
+        int reg = getReg(storage); //получение регистра для его хранения
         put(LDWGen, reg, newItem->storage, newItem->a, storage); //загрузка в регистр параметра: баз. адрес + смещение
         newItem->mode = VarGen;
         newItem->storage = reg;
@@ -569,27 +569,10 @@ void parameterGen(struct item *x, struct type *ftyp, int class, struct parameter
 
     //запись фактических передаваемых параметров функции в стек
     if(x->classType == ftyp) { //если параметр верный
-        if(class == ParGen) { //если параметр-ссылка
-            int reg = 0;
-            if(x->mode == VarGen) { //параметр-ссылка - только var!
-                if(x->a != 0) {
-                    reg = getReg(storage);
-                    put(ADDIGen, reg, x->storage, x->a, storage); //если параметр еще не загружен в регистр в scope
-                }
-                else
-                    reg = x->storage; //если загружен - берется этот регистр
-            }
-            else
-                mark("Illegal parameter mode", storage);
-            put(PSHGen, reg, SPGen, 4, storage); //ссылка на переменную - в стек
-            storage->registers[reg] = 0; //обнуление регистра
-        }
-        else { //если параметр-значение
-            if(x->mode != RegGen)
-                load(x, storage); //загрузка в регистр
-            put(PSHGen, x->storage, SPGen, 4, storage); //загрузка в стек
-            storage->registers[x->storage] = 0; //обнуление регистра
-        }
+        if(x->mode != RegGen)
+            load(x, storage); //загрузка в регистр
+        put(PSHGen, x->storage, SPGen, 4, storage); //загрузка в стек
+        storage->registers[x->storage] = 0; //обнуление регистра
     }
     else
         mark("Bad parameter type", storage);

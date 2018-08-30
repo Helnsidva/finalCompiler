@@ -5,13 +5,12 @@
 char* readCode(char* fileName) {
 
     //чтение исходного кода из файла
-    //TODO ПОМЕНЯТЬ ИМЯ НА НОРМАЛЬНОЕ
     FILE* sourceFile = NULL;
     int fileSize = 0; //размер входного файла. нужен чтобы знать количество считываемых символов
     char* sourceCode;
     printf("Oberon-0 Compiler 1.0\n");
     printf("Opening source code file...\n");
-    if((sourceFile = fopen("source.txt", "rb")) == NULL) {
+    if((sourceFile = fopen(fileName, "rb")) == NULL) {
         printf("Opening source file error!\nCompilation terminated.");
         return NULL;
     }

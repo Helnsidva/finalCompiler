@@ -14,8 +14,8 @@ void mark(char msg[], struct parameters* storage) {
     int p;
     p = storage->lastPosition;
     if (p > storage->errorPosition) {
-        fprintf(storage->reportFile, "error: position %d %s\r\n", p, msg);
-        printf("error: position %d %s \n", p, msg);
+        fprintf(storage->reportFile, "error: line %d, position %d %s\r\n", storage->linesCounter, storage->posCounter, msg);
+        printf("error: line %d, position %d %s\n", storage->linesCounter, storage->posCounter, msg);
     }
     storage->errorPosition = p;
     storage->error = 1; //обновление индексов ошибки
@@ -26,10 +26,16 @@ void comment(struct parameters* storage) {
 
     //пропуск комментария
     int index = storage->lastPosition + 2; //(* comment *). здесь пропуск (*
-    for (index; storage->sourceCode[index] != '\0'; index++) {
+    while(storage->sourceCode[index] != '\0') {
         if (storage->sourceCode[index] == ')') {
             if (storage->sourceCode[index - 1] == '*')
                 break;
+        }
+        index++;
+        storage->posCounter++;
+        if(storage->sourceCode[index] == '\n') {
+            storage->linesCounter++;
+            storage->posCounter = 0;
         }
     }
     if (storage->sourceCode[index] == '\0')
@@ -47,15 +53,28 @@ void number(struct parameters *storage) {
     int indexString = 0;
     long long int getNumber = 0; //полученное число
     char numberString[MAXINTLENGTH + 1]; //строка для записи числа
-    for (indexString, index; (storage->sourceCode[index] != '\0') &&
-                             isdigit(storage->sourceCode[index]) && (indexString < MAXINTLENGTH); indexString++, index++) {
+    while((storage->sourceCode[index] != '\0') &&
+                             isdigit(storage->sourceCode[index]) && (indexString < MAXINTLENGTH)) {
         numberString[indexString] = storage->sourceCode[index];
         numberString[indexString + 1] = '\0';
+        index++;
+        indexString++;
+        storage->posCounter++;
+        if(storage->sourceCode[index] == '\n') {
+            storage->linesCounter++;
+            storage->posCounter = 0;
+        }
     } //чтение цифр, пока не конец строки и пока число не длиннее максимально допустимого
     if (isdigit(storage->sourceCode[index])) { //если число длиннее допустимого
         while ((storage->sourceCode[index] != '\0') &&
-               (isdigit(storage->sourceCode[index])))
+               (isdigit(storage->sourceCode[index]))) {
             index++; //до конца числа
+            storage->posCounter++;
+            if(storage->sourceCode[index] == '\n') {
+                storage->linesCounter++;
+                storage->posCounter = 0;
+            }
+        }
         mark("Too big number", storage);
         storage->lastLexemeCode = nullLexical;
     }
@@ -82,13 +101,21 @@ void identifier(struct parameters *storage) {
     int index = storage->lastPosition; //первая позиция идентификатора
     int indexString = 0;
     char identification[identLength + 1]; //строка для идентификатора
-    for (indexString, index; (storage->sourceCode[index] != '\0') &&
-                             (isalnum(storage->sourceCode[index])) && (indexString < identLength); indexString++, index++)
+    while((storage->sourceCode[index] != '\0') &&
+                             (isalnum(storage->sourceCode[index])) && (indexString < identLength)) {
         identification[indexString] = storage->sourceCode[index];
+        index++;
+        indexString++;
+        storage->posCounter++;
+        if(storage->sourceCode[index] == '\n') {
+            storage->linesCounter++;
+            storage->posCounter = 0;
+        }
+    }
     identification[indexString] = '\0'; //считывание букв и цифр, пока не конец файла и до identLength
 
     if (isalnum(storage->sourceCode[index])) { //если идентификатор длиннее identLength
-        while (isalnum(storage->sourceCode[index]))
+        while(isalnum(storage->sourceCode[index]))
             index++; //идем до конца идентификатора
         mark("Too large identification", storage);
         storage->lastLexemeCode = nullLexical;
@@ -118,7 +145,12 @@ void get(struct parameters* storage) {
     storage->lastLexemeValue = -1; //"сбрасываем" все данные о предыдущем символе
     while((storage->sourceCode[index] != '\0') && (storage->sourceCode[index] <= ' ')) {
         index++;
-    } //пропускаем символы табуляции и пробелы
+        storage->posCounter++;
+        if(storage->sourceCode[index] == '\n') {
+            storage->linesCounter++;
+            storage->posCounter = 0;
+        }
+    } //пропуск символов табуляции и пробелов
     readChar = storage->sourceCode[index];
     storage->lastPosition = index;
     if (readChar == '\0')

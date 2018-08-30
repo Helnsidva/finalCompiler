@@ -65,6 +65,8 @@ struct parameters {
     struct object* universe; //глобальные области видимости
     int code[maxCodeSize]; //скомпилированный код
     int entryAddress; //адрес входа в программу
+    int linesCounter; //счетчик строк
+    int posCounter; //счетчик позиции в строке
 
 };
 

@@ -58,6 +58,7 @@
 #define FPGen 12
 #define SPGen 13
 #define LNKGen 14
+#define PCGen 15
 
 void arrayElem(struct item *, struct item *, struct parameters *);
 struct object* findField(struct object *, struct parameters *);
