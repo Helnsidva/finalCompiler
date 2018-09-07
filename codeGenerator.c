@@ -99,6 +99,10 @@ struct item* makeItem(struct object *argObject, struct parameters *storage) {
 
     //создание item из object
     struct item* newItem = (struct item*)malloc(sizeof(struct item));
+    if(newItem == NULL) {
+        mark("Memory allocation error in function makeItem", storage);
+        return storage->emptyItem;
+    }
     newItem->mode = argObject->class;
     newItem->classType = argObject->classType;
     newItem->level = argObject->level;
@@ -121,10 +125,14 @@ struct item* makeItem(struct object *argObject, struct parameters *storage) {
 
 }
 
-struct item* makeConstItem(struct type *typ, int val) {
+struct item* makeConstItem(struct type *typ, int val, struct parameters *storage) {
 
     //создание item-константы без загрузки в регистр
     struct item* newItem = (struct item*)malloc(sizeof(struct item));
+    if(newItem == NULL) {
+        mark("Memory allocation error in function makeConstItem", storage);
+        return storage->emptyItem;
+    }
     newItem->mode = ConstGen;
     newItem->classType = typ;
     newItem->a = val;
@@ -405,6 +413,10 @@ void globalCall(struct item *x, struct item *y, struct parameters *storage) {
 
     //вызов глобальных процедур
     struct item* z = (struct item*)malloc(sizeof(struct item));
+    if(z == NULL) {
+        mark("Memory allocation error in function globalCall", storage);
+        return;
+    }
     if(x->a < 4) {
         if(y->classType->classType != IntegerGen)
             mark("Argument must be integer", storage);

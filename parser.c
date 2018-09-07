@@ -12,10 +12,14 @@ void signal(char msg[], struct parameters* storage) {
 
 }
 
-void enterUniverse(int class, int value, char *name, struct type *type, struct parameters *storage) {
+int enterUniverse(int class, int value, char *name, struct type *type, struct parameters *storage) {
 
     //создание объектов в universe
     struct object* newObject = (struct object*)malloc(sizeof(struct object));
+    if(newObject == NULL) {
+        mark("Memory allocation error in function enterUniverse", storage);
+        return -1;
+    }
     newObject->class = class;
     newObject->value = value;
     strcpy(newObject->name, name);
@@ -23,6 +27,7 @@ void enterUniverse(int class, int value, char *name, struct type *type, struct p
     newObject->previousScope = NULL;
     newObject->nextObject = storage->topScope->nextObject;
     storage->topScope->nextObject = newObject;
+    return 0;
 
 }
 
@@ -35,12 +40,17 @@ void enterKeyTab(int symbol, char *name, struct symbolLex **keyTab, int *index) 
 
 }
 
-void initLexical(struct parameters *storage) {
+int initLexical(struct parameters *storage) {
 
     //инициализация структуры для сканнера
     int i;
-    for(i = 0; i < 34; i++)
-        storage->keyTab[i] = (struct symbolLex*)malloc(sizeof(struct symbolLex));
+    for(i = 0; i < 34; i++) {
+        storage->keyTab[i] = (struct symbolLex *) malloc(sizeof(struct symbolLex));
+        if(storage->keyTab[i] == NULL) {
+            mark("Memory allocation error in function initLexical", storage);
+            return -1;
+        }
+    }
     i = 0;
     enterKeyTab(nullLexical, "BY", storage->keyTab, &i);
     enterKeyTab(doLexical, "DO", storage->keyTab, &i);
@@ -76,22 +86,32 @@ void initLexical(struct parameters *storage) {
     enterKeyTab(divLexical, "DIV", storage->keyTab, &i);
     enterKeyTab(nullLexical, "LOOP", storage->keyTab, &i);
     enterKeyTab(moduleLexical, "MODULE", storage->keyTab, &i);
+    return 0;
 
 }
 
-void initTypes(struct parameters* storage) {
+int initTypes(struct parameters* storage) {
 
     //инициализация базовых типов. int и bool. их размер - 4
     storage->boolType = (struct type*)malloc(sizeof(struct type));
+    if(storage->boolType == NULL) {
+        mark("Memory allocation error in function initTypes", storage);
+        return -1;
+    }
     storage->boolType->classType = BooleanGen;
     storage->boolType->size = 4;
     storage->intType = (struct type*)malloc(sizeof(struct type));
+    if(storage->intType == NULL) {
+        mark("Memory allocation error in function initTypes", storage);
+        return -1;
+    }
     storage->intType->classType = IntegerGen;
     storage->intType->size = 4;
+    return 0;
 
 }
 
-void initScopes(struct parameters* storage) {
+int initScopes(struct parameters* storage) {
 
     //инициализация областей видимости - scopes.
     //topScope - указатель на "верхний" scope
@@ -100,22 +120,43 @@ void initScopes(struct parameters* storage) {
     //в dsc хранится предыдущий scope
     //в next хранятся объекты текущего scope
     storage->topScope = (struct object*)malloc(sizeof(struct object));
+    if(storage->topScope == NULL) {
+        mark("Memory allocation error in function initScopes", storage);
+        return -1;
+    }
     storage->guard = (struct object*)malloc(sizeof(struct object));
+    if(storage->guard == NULL) {
+        mark("Memory allocation error in function initScopes", storage);
+        return -1;
+    }
     storage->universe = (struct object*)malloc(sizeof(struct object));
+    if(storage->universe == NULL) {
+        mark("Memory allocation error in function initScopes", storage);
+        return -1;
+    }
     storage->guard->class = VarGen;
     storage->guard->classType = storage->intType;
     storage->guard->value = 0;
     storage->topScope = NULL;
     openScope(storage); //открытие universe
-    enterUniverse(TypGen, 1, "BOOLEAN", storage->boolType, storage);
-    enterUniverse(TypGen, 2, "INTEGER", storage->intType, storage);
-    enterUniverse(ConstGen, 1, "TRUE", storage->boolType, storage);
-    enterUniverse(ConstGen, 0, "FALSE", storage->boolType, storage); //инициализация типов
-    enterUniverse(SProcGen, 1, "Read", NULL, storage);
-    enterUniverse(SProcGen, 2, "Write", NULL, storage);
-    enterUniverse(SProcGen, 3, "WriteHex", NULL, storage);
-    enterUniverse(SProcGen, 4, "WriteLn", NULL, storage); //добавление глобальных процедур в universe
+    if(enterUniverse(TypGen, 1, "BOOLEAN", storage->boolType, storage) != 0)
+        return -1;
+    if(enterUniverse(TypGen, 2, "INTEGER", storage->intType, storage) != 0)
+        return -1;
+    if(enterUniverse(ConstGen, 1, "TRUE", storage->boolType, storage) != 0)
+        return -1;
+    if(enterUniverse(ConstGen, 0, "FALSE", storage->boolType, storage) != 0)
+        return -1; //инициализация типов
+    if(enterUniverse(SProcGen, 1, "Read", NULL, storage) != 0)
+        return -1;
+    if(enterUniverse(SProcGen, 2, "Write", NULL, storage) != 0)
+        return -1;
+    if(enterUniverse(SProcGen, 3, "WriteHex", NULL, storage) != 0)
+        return -1;
+    if(enterUniverse(SProcGen, 4, "WriteLn", NULL, storage) != 0)
+        return -1; //добавление глобальных процедур в universe
     storage->universe = storage->topScope;
+    return 0;
 
 }
 
@@ -141,17 +182,32 @@ int init(struct parameters* storage, char* sourceCode) {
     }
     else
         fclose(outputFile); //очистка файла output.txt
-    initLexical(storage); //инициализация keyTab
+    if(initLexical(storage) != 0)
+        return -1; //инициализация keyTab
     storage->currentLevel = 0;
     storage->PC = 0;
     memset(storage->registers, 0, sizeof(int) * 16); //обнуление регистров. 0 - не занят
-    initTypes(storage); //инициализация базовых типов
-    initScopes(storage); //инициализация topScope, guard, universe
+    if(initTypes(storage) != 0)
+        return -1; //инициализация базовых типов
+    if(initScopes(storage) != 0)
+        return -1; //инициализация topScope, guard, universe
     for(int i = 0; i < maxCodeSize; i++)
         storage->code[i] = 0;
     storage->entryAddress = 0;
     storage->posCounter = 0;
     storage->linesCounter = 0;
+    storage->emptyItem = (struct item*)malloc(sizeof(struct item));
+    if(storage->emptyItem == NULL) {
+        mark("Memory allocation error in function init", storage);
+        return -1;
+    }
+    storage->emptyItem->classType = storage->intType;
+    storage->emptyItem->c = 0;
+    storage->emptyItem->storage = 0;
+    storage->emptyItem->a = 0;
+    storage->emptyItem->b = 0;
+    storage->emptyItem->level = 0;
+    storage->emptyItem->mode = 0;
     return 0;
 
 }
@@ -160,6 +216,10 @@ struct object* createNewObject(int class, struct parameters* storage) {
 
     //создание нового объекта в текущем scope
     struct object* newObject = (struct object*)malloc(sizeof(struct object));
+    if(newObject == NULL) {
+        mark("Memory allocation error in function createNewObject", storage);
+        return storage->guard;
+    }
     struct object* buffer;
     buffer = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
@@ -186,6 +246,10 @@ struct object* findObject(struct parameters* storage) {
     struct object* bufferHead;
     struct object* buffer;
     struct object* object = (struct object*)malloc(sizeof(struct object));
+    if(object == NULL) {
+        mark("Memory allocation error in function findObject", storage);
+        return storage->guard;
+    }
     bufferHead = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
     do {
@@ -268,7 +332,7 @@ struct item* factor(struct parameters* storage) { //множители
         currentItem = selector(currentItem, storage); //либо тот же идент, либо элемент массива, либо поле записи
     } //идентификатор
     else if(storage->lastLexemeCode == numberLexical) {
-        currentItem = makeConstItem(storage->intType, storage->lastLexemeValue); //создание item с постоянным значением
+        currentItem = makeConstItem(storage->intType, storage->lastLexemeValue, storage); //создание item с постоянным значением
         get(storage);
     } //число
     else if(storage->lastLexemeCode == lparenLexical) {
@@ -359,6 +423,10 @@ struct type* getType(struct parameters* storage) {
 
     //чтение типа. (array, record, intType, boolType, созданный тип)
     struct type* type = (struct type*)malloc(sizeof(struct type)); //полученный тип
+    if(type == NULL) {
+        mark("Memory allocation error in function getType", storage);
+        return storage->intType;
+    }
     if((storage->lastLexemeCode != identLexical) && (storage->lastLexemeCode < arrayLexical)) {
         mark("No type?", storage);
         do {
@@ -434,6 +502,10 @@ struct object* identifiersList(int class, struct parameters *storage) {
 
     //чтение всех идентификаторов вида ident1, ... , ident2 : . возврат указателя на первый элемент
     struct object* headerObject = (struct object*)malloc(sizeof(struct object));
+    if(headerObject == NULL) {
+        mark("Memory allocation error in function identifiersList", storage);
+        return storage->guard;
+    }
     if(storage->lastLexemeCode == identLexical) {
         headerObject = createNewObject(class, storage); //в first первый идентификатор
         get(storage);
@@ -459,6 +531,10 @@ void openScope(struct parameters* storage) {
 
     //открытие нового scope
     struct object* newScope = (struct object*)malloc(sizeof(struct object));
+    if(newScope == NULL) {
+        mark("Memory allocation error in function openScope", storage);
+        return;
+    }
     newScope->class = HeadGen; //первый элемент scope - head
     newScope->previousScope = storage->topScope; //dsc - указатель на предыдущий scope
     newScope->nextObject = storage->guard; //след. элемента нет
@@ -904,6 +980,10 @@ void compile(char *sourceCode) {
 
     struct parameters* storage =
             (struct parameters*)malloc(sizeof(struct parameters));
+    if(storage == NULL) {
+        mark("Memory allocation error in function compile", storage);
+        return;
+    }
     if(init(storage, sourceCode) != 0)
         return; //важно, потому что могут быть ошибки обращения к памяти
     get(storage); //получение первого символа

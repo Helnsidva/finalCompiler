@@ -67,7 +67,7 @@ void arrayElem(struct item *, struct item *, struct parameters *);
 struct object* findField(struct object *, struct parameters *);
 void getField(struct item *, struct object *);
 struct item* makeItem(struct object *, struct parameters *);
-struct item* makeConstItem(struct type *, int);
+struct item* makeConstItem(struct type *, int, struct parameters *);
 void singleGenerate(int, struct item *, struct parameters *);
 void termGenerate(int, struct item *, struct item *, struct parameters *);
 void relation(int, struct item *, struct item *, struct parameters *);

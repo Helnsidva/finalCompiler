@@ -70,6 +70,7 @@ struct parameters {
     int entryAddress; //адрес входа в программу
     int linesCounter; //счетчик строк
     int posCounter; //счетчик позиции в строке
+    struct item* emptyItem; //пустой item для возврата при ошибках памяти
 
 };
 

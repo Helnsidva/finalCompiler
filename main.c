@@ -19,6 +19,8 @@ char* readCode(char* fileName) {
     fileSize = ftell(sourceFile);
     rewind(sourceFile); //возвращаемся в началу файла
     sourceCode = (char*)malloc((fileSize + 1) * sizeof(char));
+    if(sourceCode == NULL)
+        return NULL;
     fread(sourceCode, sizeof(char), fileSize, sourceFile);
     sourceCode[fileSize] = '\0';
     fclose(sourceFile);
