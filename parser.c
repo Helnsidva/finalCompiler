@@ -12,8 +12,37 @@ void signal(char msg[], struct parameters* storage) {
 
 }
 
+void freeObject(struct object *obj, struct parameters* storage) {
+
+    //освобождение памяти объекта
+    if(obj != NULL) {
+        if(obj->nextObject != NULL && obj->nextObject != obj) {
+            freeObject(obj->nextObject, storage);
+            free(obj->nextObject);
+        }
+        if(obj->previousScope != NULL && obj->previousScope != obj) {
+            freeObject(obj->previousScope, storage);
+            free(obj->previousScope);
+        }
+    }
+
+}
+
+void freeType(struct type *typ, struct parameters* storage) {
+
+    //освобождение памяти типа
+    if(typ != NULL) {
+        if(typ->fields != NULL && typ->fields != storage->guard) {
+            freeObject(typ->fields, storage);
+            free(typ->fields);
+        }
+    }
+
+}
+
 void initObject(struct object *obj, struct parameters *storage) {
 
+    //инициализация "пустого "object
     obj->level = 0;
     obj->classType = storage->emptyType;
     obj->class = 0;
@@ -26,6 +55,7 @@ void initObject(struct object *obj, struct parameters *storage) {
 
 void initType(struct type *typ, struct parameters *storage) {
 
+    //инициализация "пустого" type
     typ->classType = 0;
     typ->baseType = storage->emptyType;
     typ->fields = storage->emptyObject;
@@ -36,6 +66,7 @@ void initType(struct type *typ, struct parameters *storage) {
 
 void initItem(struct item *it, struct parameters *storage) {
 
+    //инициализация "пустого" item
     it->classType = storage->emptyType;
     it->c = 0;
     it->level = 0;
@@ -177,7 +208,7 @@ int initScopes(struct parameters* storage) {
     storage->guard->class = VarGen;
     storage->guard->classType = storage->intType;
     storage->guard->value = 0;
-    storage->topScope = NULL;
+    initObject(storage->topScope, storage);
     openScope(storage); //открытие universe
     if(enterUniverse(TypGen, 1, "BOOLEAN", storage->boolType, storage) != 0)
         return -1;
@@ -202,7 +233,7 @@ int initScopes(struct parameters* storage) {
 
 int init(struct parameters* storage, char* sourceCode) {
 
-    //инициализация
+    //инициализация storage
     storage->sourceCode = sourceCode;
     storage->lastPosition = 0;
     strcpy(storage->lastLexeme, "\0");
@@ -337,6 +368,8 @@ struct item* selector(struct item* item, struct parameters* storage) { //пер�
                 arrayElem(newItem, indexExpression, storage); //если переменная - массив, получение значение по индексу
             else
                 mark("Not an array", storage); //иначе - ошибка
+            if(indexExpression != NULL)
+                free(indexExpression);
             if(storage->lastLexemeCode == rbrakLexical)
                 get(storage);
             else
@@ -422,6 +455,8 @@ struct item* term(struct parameters* storage) {
         struct item* rightExpression;
         rightExpression = factor(storage); //получение правого выражения
         termGenerate(sign, leftExpression, rightExpression, storage); //получение выражения с учетом знака
+        if(rightExpression != NULL)
+            free(rightExpression);
     } //для умножения, div, mod, &
     return leftExpression;
 
@@ -451,6 +486,8 @@ struct item* simpleExpression(struct parameters* storage) {
             singleGenerate(sign, leftExpression, storage); //загрузка в регистры для лог. операции
         struct item* rightExpression = term(storage); //получение правого выражения
         termGenerate(sign, leftExpression, rightExpression, storage); //получение выражения с учетом знака
+        if(rightExpression != NULL)
+            free(rightExpression);
     } //анализ суммы/разности/OR
     return leftExpression;
 
@@ -466,6 +503,8 @@ struct item* expression(struct parameters* storage) {
         get(storage);
         struct item* rightExpression = simpleExpression(storage); //получение правого выражение
         relation(sign, leftExpression, rightExpression, storage); //получение выражения с учетом знака
+        if(rightExpression != NULL)
+            free(rightExpression);
     } //если след. знак ( = | # | < | <= | > | >= )
     return leftExpression;
 
@@ -508,6 +547,8 @@ struct type* getType(struct parameters* storage) {
         type->classType = ArrayGen;
         type->baseType = getType(storage); //баз. тип
         type->length = expressionItem->a; // "длина" массива
+        if(expressionItem != NULL)
+            free(expressionItem);
         type->size = type->length * type->baseType->size; //размер массива = длина * размер типа
     }
     else if(storage->lastLexemeCode == recordLexical) { //RECORD *ident1*, *ident2* : *type1* {; *identN* : *typeN*} END
@@ -620,6 +661,8 @@ int declarations(struct parameters* storage) { //возвращается раз
                 }
                 else
                     mark("Expression is not a constant", storage);
+                if(currentExpression != NULL)
+                    free(currentExpression);
                 if(storage->lastLexemeCode == semicolonLexical)
                     get(storage);
                 else
@@ -801,6 +844,8 @@ struct object* parametersMatch(struct object *formalParameter, struct parameters
     }
     else
         mark("Wrong parameters", storage);
+    if(parameterExpression != NULL)
+        free(parameterExpression);
     return nextFormalParameter;
 
 }
@@ -853,6 +898,8 @@ void statements(struct parameters *storage) {
                 struct item* bufferItem;
                 bufferItem = expression(storage);
                 store(currentItem, bufferItem, storage); //запись y в x
+                if(bufferItem != NULL)
+                    free(bufferItem);
             }
             else if(storage->lastLexemeCode == eqlLexical) {
                 mark("Lost : ?", storage);
@@ -892,11 +939,15 @@ void statements(struct parameters *storage) {
                 if(currentObject->value <= 3) //для каждой процедуры свое значение: 1, 2, 3, 4. Для 1, 2, 3 есть аргументы,
                     bufferItem = getSingleParameter(storage); //для WriteLn - нет. здесь получение аргумента
                 globalCall(currentItem, bufferItem, storage); //запись вызова
+                if(bufferItem != NULL)
+                    free(bufferItem);
             }
             else if(currentObject->class == TypGen)
                 mark("Illegal type assignment", storage); //если оператор начинается с типа
             else
                 mark("Illegal statement", storage);
+            if(currentItem != NULL)
+                free(currentItem);
         }
         else if(storage->lastLexemeCode == ifLexical) { //если цикл if
             get(storage);
@@ -934,6 +985,8 @@ void statements(struct parameters *storage) {
                 get(storage);
             else
                 mark("Lost END", storage); //IF *...* END !
+            if(currentItem != NULL)
+                free(currentItem);
         }
         else if(storage->lastLexemeCode == whileLexical) { //WHILE *cond* DO *statements* END
             get(storage);
@@ -952,6 +1005,8 @@ void statements(struct parameters *storage) {
                 get(storage);
             else
                 mark("Lost END", storage);
+            if(currentItem != NULL)
+                free(currentItem);
         }
         if(storage->lastLexemeCode == semicolonLexical)
             get(storage);
@@ -1031,6 +1086,39 @@ int module(struct parameters* storage) {
 
 }
 
+void freeStorage(struct parameters* storage) {
+
+    freeObject(storage->universe, storage);
+    if(storage->universe != NULL)
+        free(storage->universe);
+    if(storage->topScope != NULL)
+        free(storage->topScope);
+    freeObject(storage->emptyObject, storage);
+    if(storage->emptyObject != NULL)
+        free(storage->emptyObject);
+    freeType(storage->emptyType, storage);
+    if(storage->emptyType != NULL)
+        free(storage->emptyType);
+    freeType(storage->intType, storage);
+    if(storage->intType != NULL)
+        free(storage->intType);
+    freeType(storage->boolType, storage);
+    if(storage->boolType != NULL)
+        free(storage->boolType);
+    freeObject(storage->guard, storage);
+    if(storage->guard != NULL)
+        free(storage->guard);
+    if(storage->emptyItem != NULL)
+        free(storage->emptyItem);
+    if(storage->sourceCode != NULL)
+        free(storage->sourceCode);
+    for(int i = 0; i < keyTabSize; i++) {
+        if(storage->keyTab[i] != NULL)
+            free(storage->keyTab[i]);
+    }
+
+}
+
 void compile(char *sourceCode) {
 
     struct parameters* storage =
@@ -1045,5 +1133,9 @@ void compile(char *sourceCode) {
     if (module(storage) == 0) //анализ кода, компиляция
         decode(storage); //если компиляция прошла успешно - запись кода в output.txt
     signal("Compilation finished.", storage);
+    if(storage != NULL) {
+        freeStorage(storage);
+        free(storage);
+    }
 
 }

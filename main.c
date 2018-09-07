@@ -68,6 +68,10 @@ int main(int argc, char* argv[]) {
         if(sourceCode != NULL) {
             compile(sourceCode); //если код считан успешно - начало компиляции
         }
+        if(inputFileName != NULL)
+            free(inputFileName);
+        if(sourceCode != NULL)
+            free(sourceCode);
     }
     return 0;
 

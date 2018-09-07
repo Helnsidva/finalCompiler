@@ -442,6 +442,8 @@ void globalCall(struct item *x, struct item *y, struct parameters *storage) {
     }
     else //writeln
         put(WRLGen, 0, 0, 0, storage); //печать \n
+    if(z != NULL)
+        free(z);
 
 }
 
