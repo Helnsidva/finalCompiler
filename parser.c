@@ -12,6 +12,40 @@ void signal(char msg[], struct parameters* storage) {
 
 }
 
+void initObject(struct object *obj, struct parameters *storage) {
+
+    obj->level = 0;
+    obj->classType = storage->emptyType;
+    obj->class = 0;
+    obj->previousScope = storage->emptyObject;
+    obj->nextObject = storage->emptyObject;
+    obj->value = 0;
+    strcpy(obj->name, "\0");
+
+}
+
+void initType(struct type *typ, struct parameters *storage) {
+
+    typ->classType = 0;
+    typ->baseType = storage->emptyType;
+    typ->fields = storage->emptyObject;
+    typ->length = 0;
+    typ->size = 0;
+
+}
+
+void initItem(struct item *it, struct parameters *storage) {
+
+    it->classType = storage->emptyType;
+    it->c = 0;
+    it->level = 0;
+    it->mode = 0;
+    it->b = 0;
+    it->a = 0;
+    it->storage = 0;
+
+}
+
 int enterUniverse(int class, int value, char *name, struct type *type, struct parameters *storage) {
 
     //создание объектов в universe
@@ -20,6 +54,7 @@ int enterUniverse(int class, int value, char *name, struct type *type, struct pa
         mark("Memory allocation error in function enterUniverse", storage);
         return -1;
     }
+    initObject(newObject, storage);
     newObject->class = class;
     newObject->value = value;
     strcpy(newObject->name, name);
@@ -45,7 +80,7 @@ int initLexical(struct parameters *storage) {
     //инициализация структуры для сканнера
     int i;
     for(i = 0; i < 34; i++) {
-        storage->keyTab[i] = (struct symbolLex *) malloc(sizeof(struct symbolLex));
+        storage->keyTab[i] = (struct symbolLex*)malloc(sizeof(struct symbolLex));
         if(storage->keyTab[i] == NULL) {
             mark("Memory allocation error in function initLexical", storage);
             return -1;
@@ -98,6 +133,7 @@ int initTypes(struct parameters* storage) {
         mark("Memory allocation error in function initTypes", storage);
         return -1;
     }
+    initType(storage->boolType, storage);
     storage->boolType->classType = BooleanGen;
     storage->boolType->size = 4;
     storage->intType = (struct type*)malloc(sizeof(struct type));
@@ -105,6 +141,7 @@ int initTypes(struct parameters* storage) {
         mark("Memory allocation error in function initTypes", storage);
         return -1;
     }
+    initType(storage->intType, storage);
     storage->intType->classType = IntegerGen;
     storage->intType->size = 4;
     return 0;
@@ -124,16 +161,19 @@ int initScopes(struct parameters* storage) {
         mark("Memory allocation error in function initScopes", storage);
         return -1;
     }
+    initObject(storage->topScope, storage);
     storage->guard = (struct object*)malloc(sizeof(struct object));
     if(storage->guard == NULL) {
         mark("Memory allocation error in function initScopes", storage);
         return -1;
     }
+    initObject(storage->guard, storage);
     storage->universe = (struct object*)malloc(sizeof(struct object));
     if(storage->universe == NULL) {
         mark("Memory allocation error in function initScopes", storage);
         return -1;
     }
+    initObject(storage->universe, storage);
     storage->guard->class = VarGen;
     storage->guard->classType = storage->intType;
     storage->guard->value = 0;
@@ -182,6 +222,28 @@ int init(struct parameters* storage, char* sourceCode) {
     }
     else
         fclose(outputFile); //очистка файла output.txt
+    storage->emptyType = (struct type*)malloc(sizeof(struct type));
+    if(storage->emptyType == NULL) {
+        mark("Memory allocation error in function init", storage);
+        return -1;
+    }
+    storage->emptyType->classType = 0;
+    storage->emptyType->baseType = storage->emptyType;
+    storage->emptyType->length = 0;
+    storage->emptyType->size = 0;
+    storage->emptyObject = (struct object*)malloc(sizeof(struct object));
+    if(storage->emptyObject == NULL) {
+        mark("Memory allocation error in function init", storage);
+        return -1;
+    }
+    storage->emptyType->fields = storage->emptyObject;
+    initObject(storage->emptyObject, storage);
+    storage->emptyItem = (struct item*)malloc(sizeof(struct item));
+    if(storage->emptyItem == NULL) {
+        mark("Memory allocation error in function init", storage);
+        return -1;
+    }
+    initItem(storage->emptyItem, storage);
     if(initLexical(storage) != 0)
         return -1; //инициализация keyTab
     storage->currentLevel = 0;
@@ -196,18 +258,6 @@ int init(struct parameters* storage, char* sourceCode) {
     storage->entryAddress = 0;
     storage->posCounter = 0;
     storage->linesCounter = 0;
-    storage->emptyItem = (struct item*)malloc(sizeof(struct item));
-    if(storage->emptyItem == NULL) {
-        mark("Memory allocation error in function init", storage);
-        return -1;
-    }
-    storage->emptyItem->classType = storage->intType;
-    storage->emptyItem->c = 0;
-    storage->emptyItem->storage = 0;
-    storage->emptyItem->a = 0;
-    storage->emptyItem->b = 0;
-    storage->emptyItem->level = 0;
-    storage->emptyItem->mode = 0;
     return 0;
 
 }
@@ -220,6 +270,7 @@ struct object* createNewObject(int class, struct parameters* storage) {
         mark("Memory allocation error in function createNewObject", storage);
         return storage->guard;
     }
+    initObject(newObject, storage);
     struct object* buffer;
     buffer = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
@@ -250,6 +301,7 @@ struct object* findObject(struct parameters* storage) {
         mark("Memory allocation error in function findObject", storage);
         return storage->guard;
     }
+    initObject(object, storage);
     bufferHead = storage->topScope;
     strcpy(storage->guard->name, storage->lastLexeme);
     do {
@@ -427,6 +479,7 @@ struct type* getType(struct parameters* storage) {
         mark("Memory allocation error in function getType", storage);
         return storage->intType;
     }
+    initType(type, storage);
     if((storage->lastLexemeCode != identLexical) && (storage->lastLexemeCode < arrayLexical)) {
         mark("No type?", storage);
         do {
@@ -506,6 +559,7 @@ struct object* identifiersList(int class, struct parameters *storage) {
         mark("Memory allocation error in function identifiersList", storage);
         return storage->guard;
     }
+    initObject(headerObject, storage);
     if(storage->lastLexemeCode == identLexical) {
         headerObject = createNewObject(class, storage); //в first первый идентификатор
         get(storage);
@@ -535,6 +589,7 @@ void openScope(struct parameters* storage) {
         mark("Memory allocation error in function openScope", storage);
         return;
     }
+    initObject(newScope, storage);
     newScope->class = HeadGen; //первый элемент scope - head
     newScope->previousScope = storage->topScope; //dsc - указатель на предыдущий scope
     newScope->nextObject = storage->guard; //след. элемента нет

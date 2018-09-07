@@ -71,9 +71,12 @@ struct parameters {
     int linesCounter; //счетчик строк
     int posCounter; //счетчик позиции в строке
     struct item* emptyItem; //пустой item для возврата при ошибках памяти
+    struct object* emptyObject; //пустой object для возврата при ошибках памяти
+    struct type* emptyType; //пустой type для возврата при ошибках памяти
 
 };
 
 void compile(char*);
+void initItem(struct item *, struct parameters *);
 
 #endif

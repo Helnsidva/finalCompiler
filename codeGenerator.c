@@ -133,6 +133,7 @@ struct item* makeConstItem(struct type *typ, int val, struct parameters *storage
         mark("Memory allocation error in function makeConstItem", storage);
         return storage->emptyItem;
     }
+    initItem(newItem, storage);
     newItem->mode = ConstGen;
     newItem->classType = typ;
     newItem->a = val;
@@ -417,6 +418,7 @@ void globalCall(struct item *x, struct item *y, struct parameters *storage) {
         mark("Memory allocation error in function globalCall", storage);
         return;
     }
+    initItem(z, storage);
     if(x->a < 4) {
         if(y->classType->classType != IntegerGen)
             mark("Argument must be integer", storage);
