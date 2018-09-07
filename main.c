@@ -32,6 +32,20 @@ void manual() {
     printf("Oberon-0 Compiler 1.0.\n\n");
     printf("Invalid command line format!\n");
     printf("Correct format: \"Oberon-0-Compiler.exe source.txt\", where \"source.txt\" - file with source code in the Oberon-0 language.\n");
+    printf("Example of Oberon-0 code: \nMODULE If;\n"
+                   "VAR \n"
+                   "\t\ti, j, z: INTEGER;\n"
+                   "\tBEGIN\n"
+                   "\t\ti := 1;\n"
+                   "\t\tj := 2;\n"
+                   "\t\tIF (i > j) THEN \n"
+                   "\t\t\tz := j;\n"
+                   "\t\tELSIF (i = j) THEN\n"
+                   "\t\t\tz := 5;\n"
+                   "\t\tELSE \n"
+                   "\t\t\tz := 10;\n"
+                   "\t\tEND;\n"
+                   "END If.\n");
     printf("Compiler compiles for RISC machine.\n");
     printf("Compiled code is saved in the current directory in \"output.txt\" file.\n");
     return;

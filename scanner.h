@@ -1,4 +1,10 @@
+#ifndef _SCANNER_H
+#define _SCANNER_H
+
 #include "parser.h"
+
+#define MAXINTLENGTH 10 //максимальная длина int
+#define MAXINT 2147483647 //максимальное значение int
 
 //терминальные символы
 #define nullLexical 0
@@ -47,3 +53,5 @@
 
 void get(struct parameters*);
 void mark(char[], struct parameters*);
+
+#endif

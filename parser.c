@@ -1,16 +1,8 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
-#include <time.h>
 #include "scanner.h"
 #include "codeGenerator.h"
-
-void openScope(struct parameters*);
-void closeScope(struct parameters*);
-void statements(struct parameters*);
-struct item* expression(struct parameters*);
-struct object* identifiersList(int, struct parameters*);
-int parameterFormat(struct object*);
 
 void signal(char msg[], struct parameters* storage) {
 

@@ -1,3 +1,6 @@
+#ifndef _PARSER_H
+#define _PARSER_H
+
 #define identLength 16 //максимальная длина идентификатора
 #define keyTabSize 34 //количество терминальных символов языка
 #define maxCodeSize 1000 //максимальная длина кода
@@ -71,3 +74,5 @@ struct parameters {
 };
 
 void compile(char*);
+
+#endif

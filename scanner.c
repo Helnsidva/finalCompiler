@@ -2,11 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
-
 #include "scanner.h"
-
-#define MAXINTLENGTH 10 //максимальная длина int
-#define MAXINT 2147483647 //максимальное значение int
 
 void mark(char msg[], struct parameters* storage) {
 

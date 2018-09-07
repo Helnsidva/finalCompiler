@@ -1,3 +1,6 @@
+#ifndef _CODEGEN_H
+#define _CODEGEN_H
+
 //классы, режимы
 #define HeadGen 0
 #define VarGen 1
@@ -82,3 +85,11 @@ void codeHeader(int, struct parameters *);
 void codeEnding(struct parameters *);
 void decode(struct parameters*);
 void parameterGen(struct item *, struct type *, struct parameters *);
+void openScope(struct parameters*);
+void closeScope(struct parameters*);
+void statements(struct parameters*);
+struct item* expression(struct parameters*);
+struct object* identifiersList(int, struct parameters*);
+int parameterFormat(struct object*);
+
+#endif
